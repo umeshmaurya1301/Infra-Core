@@ -1,8 +1,10 @@
 package org.infra.commons.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
 
@@ -13,19 +15,20 @@ import java.time.LocalDateTime;
 @MappedSuperclass
 @Getter
 @Setter
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public abstract class BaseEntity {
 
     @Column(name = "created_date", nullable = false, updatable = false)
-    private LocalDateTime createdDate;
+    LocalDateTime createdDate;
 
     @Column(name = "updated_date")
-    private LocalDateTime updatedDate;
+    LocalDateTime updatedDate;
 
-    @Column(name = "created_by", nullable = false, updatable = false, length = 100)
-    private String createdBy;
+    @Column(name = "created_by", nullable = false, updatable = false)
+    String createdBy;
 
-    @Column(name = "updated_by", length = 100)
-    private String updatedBy;
+    @Column(name = "updated_by")
+    String updatedBy;
 
     @PrePersist
     protected void onCreate() {
