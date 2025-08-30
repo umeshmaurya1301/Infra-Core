@@ -25,9 +25,7 @@ dependencies {
 }
 
 // This module should not create a fat JAR since it's a library
-tasks.bootJar {
-    enabled = false
-}
+// Note: bootJar task is not available since Spring Boot plugin is not applied
 
 tasks.jar {
     enabled = true

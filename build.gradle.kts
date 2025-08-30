@@ -16,7 +16,7 @@ extra["assertjVersion"] = "3.26.3"
 extra["jacksonVersion"] = "2.18.2"
 extra["lombokVersion"] = "1.18.36"
 extra["slf4jVersion"] = "2.0.16"
-extra["logbackVersion"] = "1.5.12"
+extra["logbackVersion"] = "1.5.14"
 extra["postgresqlVersion"] = "42.7.4"
 extra["h2Version"] = "2.3.232"
 extra["jjwtVersion"] = "0.12.6"
@@ -41,8 +41,8 @@ allprojects {
 subprojects {
     apply(plugin = "java")
 
-    // Apply Spring Boot plugin only to certain modules
-    if (project.name !in listOf("infra-commons", "infra-core-module", "infra-cryptography")) {
+    // Apply Spring Boot plugin only to modules that need it (applications, not libraries)
+    if (project.name in listOf("infra-core")) {
         apply(plugin = "org.springframework.boot")
     }
     apply(plugin = "io.spring.dependency-management")
@@ -68,9 +68,9 @@ subprojects {
         implementation("org.springframework.boot:spring-boot-starter-actuator")
         implementation("org.springframework.boot:spring-boot-starter-validation")
 
-        implementation("org.slf4j:slf4j-api:${property("slf4jVersion")}")
-        implementation("ch.qos.logback:logback-classic:${property("logbackVersion")}")
-        implementation("com.fasterxml.jackson.core:jackson-databind:${property("jacksonVersion")}")
+        implementation("org.slf4j:slf4j-api")
+        implementation("ch.qos.logback:logback-classic")
+        implementation("com.fasterxml.jackson.core:jackson-databind")
 
         // ======================
         // Compile Only / Annotation Processing
