@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: infra-cryptography
+
+server:
+  port: 8082
+
+logging:
+  level:
+    org.infra.cryptography: DEBUG
+    root: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# Cryptography Configuration
+crypto:
+  default-algorithm: AES
+  key-length: 256
+  secure-random-algorithm: SHA1PRNG

@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: infra-security
+  
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/auth/realms/infra
+          
+server:
+  port: 8081
+
+logging:
+  level:
+    org.infra.security: DEBUG
+    org.springframework.security: DEBUG
+    root: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# JWT Configuration
+jwt:
+  secret: mySecretKey
+  expiration: 86400000 # 24 hours in milliseconds
