@@ -4,12 +4,16 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * Core module application containing core services and business logic.
- * This module depends on infra-commons and provides fundamental services.
+ * Main application entry point that assembles all infrastructure modules.
+ * This module serves as the application starter and configuration aggregator.
  */
 @SpringBootApplication(scanBasePackages = {
     "org.infra.commons",
-    "org.infra.core"
+    "org.infra.core",
+    "org.infra.security",
+    "org.infra.cryptography", 
+    "org.infra.audit",
+    "org.infra.validation"
 })
 public class CoreApplication {
 

@@ -45,6 +45,27 @@ Subprojects (modules/*/build.gradle.kts)
 └── Library-Specific Settings
 ```
 
+### **New Modular Architecture (2024)**
+```
+infra-core (Application Entry Point)
+├── infra-commons (Foundation Layer)
+│   ├── BaseEntity, BaseException, DTOs
+│   ├── Utility classes, Constants
+│   └── No dependencies (foundation)
+├── infra-security (Security Framework)
+│   ├── Spring Security, JWT
+│   └── Depends on: infra-commons
+├── infra-cryptography (Encryption)
+│   ├── Crypto utilities, Key management
+│   └── Depends on: infra-commons
+├── infra-audit (Logging & Audit)
+│   ├── API logging, Correlation IDs
+│   └── Depends on: infra-commons
+└── infra-validation (Validation)
+    ├── Custom validators, Annotations
+    └── Depends on: infra-commons
+```
+
 ### Benefits of This Architecture
 1. **Reduced Maintenance**: Update versions in one place
 2. **Version Consistency**: All modules use same versions
@@ -53,6 +74,11 @@ Subprojects (modules/*/build.gradle.kts)
 5. **Security Updates**: Automatic patches through Spring Boot updates
 6. **Library Reusability**: Modules can be used as dependencies in other projects
 7. **Flexible Deployment**: Choose between library and application modes
+8. **Single Responsibility**: Each module has one clear purpose
+9. **Independent Development**: Teams can work on different modules
+10. **Selective Dependencies**: Only include what you need
+11. **Better Testing**: Test each concern in isolation
+12. **Easier Maintenance**: Changes isolated to specific modules
 
 ## File Structure
 
@@ -61,15 +87,20 @@ Subprojects (modules/*/build.gradle.kts)
 infra-core/
 ├── build.gradle.kts                    # Root dependency management + publishing config
 ├── settings.gradle.kts                 # Module discovery and structure
+├── gradle/libs.versions.toml          # Centralized version catalog
 └── modules/
     ├── infra-commons/
-    │   └── build.gradle.kts           # Shared utilities + maven-publish
+    │   └── build.gradle.kts           # Foundation layer + maven-publish
     ├── infra-core/
-    │   └── build.gradle.kts           # Core business logic + maven-publish
+    │   └── build.gradle.kts           # Application entry point + maven-publish
+    ├── infra-security/
+    │   └── build.gradle.kts           # Security framework + maven-publish
     ├── infra-cryptography/
-    │   └── build.gradle.kts           # Cryptography + maven-publish
-    └── infra-security/
-        └── build.gradle.kts           # Security + maven-publish + Spring Boot
+    │   └── build.gradle.kts           # Encryption services + maven-publish
+    ├── infra-audit/
+    │   └── build.gradle.kts           # Logging & audit + maven-publish
+    └── infra-validation/
+        └── build.gradle.kts           # Validation framework + maven-publish
 ```
 
 ### File Responsibilities
@@ -131,7 +162,9 @@ subprojects {
     apply(plugin = "java")
     
     // Only apply Spring Boot to modules that need it
-    if (project.name != "infra-commons" && project.name != "infra-core-module" && project.name != "infra-cryptography") {
+    if (project.name in listOf("infra-commons", "infra-cryptography")) {
+        // Pure library modules - no Spring Boot
+    } else {
         apply(plugin = "org.springframework.boot")
     }
     apply(plugin = "io.spring.dependency-management")
@@ -157,43 +190,55 @@ subprojects {
 
 ### Dependency Graph
 ```
-infra-commons (Base Module)
+infra-commons (Foundation Layer)
     ↑
-infra-core
+infra-security, infra-cryptography, infra-audit, infra-validation
     ↑
-infra-security
-    ↑
-infra-cryptography
+infra-core (Application Entry Point)
 ```
 
 ### Module Dependencies Detail
 
 #### 1. **infra-commons**
-- **Purpose**: Shared utilities and constants
-- **Dependencies**: None (base module)
-- **Exports**: `ApplicationConstants`, utility classes
+- **Purpose**: Foundation layer with shared utilities and common components
+- **Dependencies**: None (foundation layer)
+- **Exports**: `BaseEntity`, `BaseException`, `ApiResponse<T>`, `PageResponse<T>`, utility classes
 - **Spring Boot**: ❌ Not applied (pure library)
 - **Publishing**: ✅ Maven library with JAR, sources, javadoc
 
 #### 2. **infra-core**
-- **Purpose**: Core business logic and services
-- **Dependencies**: `infra-commons`
-- **Usage**: `BaseService` uses `ApplicationConstants`
-- **Spring Boot**: ❌ Not applied (pure library)
+- **Purpose**: Application entry point and module orchestrator
+- **Dependencies**: All other modules (`infra-commons`, `infra-security`, `infra-cryptography`, `infra-audit`, `infra-validation`)
+- **Usage**: Main Spring Boot application, configuration aggregation
+- **Spring Boot**: ✅ Applied (main application)
 - **Publishing**: ✅ Maven library with JAR, sources, javadoc
 
-#### 3. **infra-cryptography**
+#### 3. **infra-security**
+- **Purpose**: Security framework and authentication services
+- **Dependencies**: `infra-commons`
+- **Usage**: Spring Security configuration, JWT handling, role management
+- **Spring Boot**: ✅ Applied (needs Spring Security features)
+- **Publishing**: ✅ Maven library with JAR, sources, javadoc
+
+#### 4. **infra-cryptography**
 - **Purpose**: Encryption and cryptography services
 - **Dependencies**: `infra-commons`
-- **Usage**: Uses `ApplicationConstants` for algorithm settings
+- **Usage**: Crypto utilities, key management, hashing
 - **Spring Boot**: ❌ Not applied (pure library)
 - **Publishing**: ✅ Maven library with JAR, sources, javadoc
 
-#### 4. **infra-security**
-- **Purpose**: Security configuration and authentication
-- **Dependencies**: `infra-commons`, `infra-core-module`
-- **Usage**: Scans packages from other modules
-- **Spring Boot**: ✅ Applied (needs Spring Security features)
+#### 5. **infra-audit**
+- **Purpose**: Centralized logging and audit services
+- **Dependencies**: `infra-commons`
+- **Usage**: API request/response logging, correlation ID management, performance monitoring
+- **Spring Boot**: ✅ Applied (needs Spring Web features)
+- **Publishing**: ✅ Maven library with JAR, sources, javadoc
+
+#### 6. **infra-validation**
+- **Purpose**: Custom validation framework and utilities
+- **Dependencies**: `infra-commons`
+- **Usage**: Custom validation annotations, validators, validation utilities
+- **Spring Boot**: ✅ Applied (needs Spring Validation features)
 - **Publishing**: ✅ Maven library with JAR, sources, javadoc
 
 ### Dependency Declaration Examples
@@ -287,6 +332,8 @@ publishing {
 ./gradlew :infra-core-module:publishToMavenLocal
 ./gradlew :infra-security:publishToMavenLocal
 ./gradlew :infra-cryptography:publishToMavenLocal
+./gradlew :infra-audit:publishToMavenLocal
+./gradlew :infra-validation:publishToMavenLocal
 ```
 
 ### Published Artifacts
@@ -315,10 +362,23 @@ After publishing to Maven local, these libraries can be used in other projects:
 #### Gradle
 ```gradle
 dependencies {
+    // Foundation layer - always needed
     implementation 'org.infra:infra-commons:1.0.0'
+    
+    // Application entry point
     implementation 'org.infra:infra-core-module:1.0.0'
+    
+    // Security framework
     implementation 'org.infra:infra-security:1.0.0'
+    
+    // Encryption services
     implementation 'org.infra:infra-cryptography:1.0.0'
+    
+    // Centralized logging
+    implementation 'org.infra:infra-audit:1.0.0'
+    
+    // Validation framework
+    implementation 'org.infra:infra-validation:1.0.0'
 }
 ```
 
@@ -351,7 +411,9 @@ subprojects {
     apply(plugin = "java")
     
     // Only apply Spring Boot to modules that need it
-    if (project.name != "infra-commons" && project.name != "infra-core-module" && project.name != "infra-cryptography") {
+    if (project.name in listOf("infra-commons", "infra-cryptography")) {
+        // Pure library modules - no Spring Boot
+    } else {
         apply(plugin = "org.springframework.boot")
     }
     apply(plugin = "io.spring.dependency-management")
@@ -555,10 +617,47 @@ extra["jjwtVersion"] = "0.12.7"
 - **Build Health**: Monitor CI/CD pipeline for dependency issues
 - **Publishing Health**: Verify Maven local artifacts are generated correctly
 
+## **New Modules (2024 Update)**
+
+### **infra-audit** - Centralized Logging & Audit
+- **Purpose**: API request/response logging, audit trails, performance monitoring
+- **Key Features**: 
+  - `ApiLoggingInterceptor` for automatic request/response logging
+  - Correlation ID management for request tracking
+  - Performance monitoring and metrics
+  - Sensitive data sanitization
+- **Dependencies**: `infra-commons`
+- **Spring Boot**: ✅ Applied (needs Spring Web features)
+
+### **infra-validation** - Custom Validation Framework
+- **Purpose**: Extensible validation system with custom annotations and validators
+- **Key Features**:
+  - `@ValidEmail` annotation and validator
+  - Extensible validation infrastructure
+  - Integration with Jakarta Validation
+- **Dependencies**: `infra-commons`
+- **Spring Boot**: ✅ Applied (needs Spring Validation features)
+
+### **Enhanced infra-commons** - Foundation Layer
+- **New Components**:
+  - `BaseEntity` with automatic audit fields
+  - Exception hierarchy (`BaseException`, `BusinessException`, `TechnicalException`)
+  - Standard DTOs (`ApiResponse<T>`, `PageResponse<T>`)
+  - Utility classes (`StringUtils`, `DateUtils`)
+- **Dependencies**: None (pure foundation)
+
 ## Conclusion
 
 This dependency management system provides a robust, maintainable approach to managing dependencies in a multi-module Spring Boot project that can also function as a library project. By leveraging Spring Boot's BOM, centralizing version management, and providing flexible Spring Boot application, it reduces maintenance overhead while ensuring version compatibility, security, and reusability.
 
+The **2024 modular architecture update** introduces:
+- **Clean separation of concerns** with dedicated modules for each major functionality
+- **Single responsibility principle** - each module has one clear purpose
+- **Independent development** - teams can work on different modules
+- **Selective dependencies** - only include what you need
+- **Better testing** - test each concern in isolation
+- **Easier maintenance** - changes isolated to specific modules
+
 The key to success is following the established patterns and maintaining consistency across all modules. The addition of Maven publishing capabilities makes the project more valuable as it can be used as a dependency in other projects. Regular updates and monitoring ensure the system remains secure, up-to-date, and publishable.
 
-The system now supports both application and library modes, making it versatile for different use cases while maintaining the benefits of centralized dependency management.
+The system now supports both application and library modes, making it versatile for different use cases while maintaining the benefits of centralized dependency management. The new modular architecture provides a solid foundation for scalable, maintainable infrastructure code while keeping concerns properly separated and dependencies clean.

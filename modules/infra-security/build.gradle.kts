@@ -8,7 +8,6 @@ description = "Security configuration and authentication services"
 dependencies {
     // Inter-module dependencies
     implementation(project(":infra-commons"))
-    implementation(project(":infra-core-module"))
     
     // Spring Security using centralized versions
     implementation("org.springframework.boot:spring-boot-starter-security")

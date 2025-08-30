@@ -6,10 +6,16 @@ plugins {
 description = "Core business logic and services"
 
 dependencies {
-    // Module dependencies
+    // Module dependencies - include all other modules
     implementation(project(":infra-commons"))
+    implementation(project(":infra-security"))
+    implementation(project(":infra-cryptography"))
+    implementation(project(":infra-audit"))
+    implementation(project(":infra-validation"))
     
-    // Additional core-specific dependencies can be added here
+    // Spring Boot starter for main application
+    implementation("org.springframework.boot:spring-boot-starter")
+    implementation("org.springframework.boot:spring-boot-starter-web")
 }
 
 

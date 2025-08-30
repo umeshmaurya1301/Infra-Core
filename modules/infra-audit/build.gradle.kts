@@ -3,33 +3,24 @@ plugins {
     id("maven-publish")
 }
 
-description = "Shared utilities and common components"
+description = "Centralized logging and audit infrastructure"
 
 dependencies {
-    // Additional commons-specific dependencies using centralized versions
-    implementation("org.apache.commons:commons-lang3:${property("commonsLang3Version")}")
-    implementation("org.apache.commons:commons-collections4:${property("commonsCollections4Version")}")
-    implementation("commons-io:commons-io:${property("commonsIoVersion")}")
-    implementation("com.google.guava:guava:${property("guavaVersion")}")
+    // Module dependencies
+    implementation(project(":infra-commons"))
     
-    // JPA and Persistence
-    implementation("jakarta.persistence:jakarta.persistence-api")
-    implementation("jakarta.validation:jakarta.validation-api")
+    // Spring Boot Web for interceptors and filters
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
     
-    // Spring Boot dependencies
-    implementation("org.springframework.boot:spring-boot-starter")
-    implementation("org.springframework.boot:spring-boot-starter-validation")
+    // Logging
+    implementation("org.springframework.boot:spring-boot-starter-logging")
+    implementation("net.logstash.logback:logstash-logback-encoder:7.4")
     
     // JSON processing
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
-    
-    // Configuration properties
-    implementation("org.springframework.boot:spring-boot-configuration-processor")
-    annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 }
-
-
 
 tasks.jar {
     enabled = true
@@ -42,8 +33,6 @@ publishing {
         create<MavenPublication>("maven") {
             from(components["java"])
             
-
-            
             // Set artifact coordinates
             groupId = project.group.toString()
             artifactId = project.name
@@ -52,7 +41,7 @@ publishing {
             // Add POM information
             pom {
                 name.set(project.name)
-                description.set(project.description ?: "Infrastructure library module")
+                description.set(project.description ?: "Infrastructure audit module")
                 url.set("https://github.com/yourusername/infra-core")
                 
                 licenses {
