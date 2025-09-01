@@ -1,19 +1,23 @@
 package org.infra.commons.entity;
 
-
 import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 import jakarta.persistence.MappedSuperclass;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.SuperBuilder;
 
+/**
+ * Embeddable address details for reuse across entities.
+ */
+@Embeddable
+@Getter @Setter
+@ToString
 @MappedSuperclass
-@Getter
-@Setter
+@SuperBuilder
+@NoArgsConstructor @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public abstract class Location extends BaseEntity {
-
+public class Address extends BaseEntity {
     @Column(name = "line1", nullable = false)
     String line1;
 
@@ -32,10 +36,10 @@ public abstract class Location extends BaseEntity {
     @Column(name = "district")
     String district;
 
-    @Column(name = "state")
+    @Column(name = "state", length = 120)
     String state;
 
-    @Column(name = "country")
+    @Column(name = "country", length = 120)
     String country;
 
     @Column(name = "pin_code", length = 10)
