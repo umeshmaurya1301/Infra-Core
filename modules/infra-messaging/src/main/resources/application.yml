@@ -1,0 +1,100 @@
+# Default configuration for infra-messaging module
+# This file contains sensible defaults that can be overridden by consuming applications
+
+infra:
+  messaging:
+    enabled: true
+    
+    kafka:
+      enabled: false  # Disabled by default, must be explicitly enabled
+      bootstrap-servers: localhost:9092
+      producer:
+        enabled: true
+        key-serializer: org.apache.kafka.common.serialization.StringSerializer
+        value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+        acks: all
+        retries: 3
+        batch-size: 16384
+        linger-ms: 5
+        buffer-memory: 33554432
+        request-timeout: PT30S
+      consumer:
+        enabled: true
+        group-id: default-group
+        key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+        auto-offset-reset: earliest
+        enable-auto-commit: false
+        session-timeout: PT30S
+        heartbeat-interval: PT3S
+        max-poll-records: 500
+        max-poll-interval: PT5M
+        concurrency: 1
+      security:
+        protocol: PLAINTEXT
+      dlq:
+        enabled: true
+        topic-suffix: .dlq
+        max-retries: 3
+        retry-interval: PT1S
+        backoff-multiplier: 2.0
+        max-backoff-interval: PT5M
+    
+    rabbitmq:
+      enabled: false  # Disabled by default, must be explicitly enabled
+      host: localhost
+      port: 5672
+      username: guest
+      password: guest
+      virtual-host: /
+      connection-timeout: PT60S
+      requested-heartbeat: PT60S
+      publisher:
+        enabled: true
+        confirm-enabled: true
+        confirm-timeout: PT5S
+        return-enabled: true
+        retries: 3
+        retry-interval: PT1S
+      consumer:
+        enabled: true
+        concurrency: 1
+        max-concurrency: 10
+        prefetch-count: 250
+        tx-size: 1
+        acknowledge-mode: AUTO
+        auto-startup: true
+        receive-timeout: PT1S
+        recovery-interval: PT5S
+      exchange:
+        default-name: default.exchange
+        type: topic
+        durable: true
+        auto-delete: false
+      queue:
+        default-name: default.queue
+        durable: true
+        exclusive: false
+        auto-delete: false
+      dlq:
+        enabled: true
+        exchange-suffix: .dlx
+        queue-suffix: .dlq
+        routing-key-suffix: .dlq
+        max-retries: 3
+        retry-interval: PT1S
+        message-ttl: PT24H
+      ssl:
+        enabled: false
+        algorithm: TLSv1.2
+        validate-server-certificate: true
+        verify-hostname: true
+
+# Logging configuration
+logging:
+  level:
+    org.infra.messaging: INFO
+    org.springframework.kafka: WARN
+    org.springframework.amqp: WARN
+    org.apache.kafka: WARN
+    com.rabbitmq: WARN

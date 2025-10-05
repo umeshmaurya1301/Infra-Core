@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: infra-cloud
+
+# Infrastructure Cloud Services Configuration
+infra:
+  cloud:
+    # GCP Cloud Storage Configuration
+    gcp:
+      # Required: GCP Project ID (consuming project must provide this)
+      # project-id: "your-gcp-project-id"
+      
+      # Authentication (consuming project should provide one of these)
+      # credentials-path: "/path/to/service-account.json"
+      # credentials-json: "base64-encoded-service-account-json"
+      
+      # Optional: Default bucket name
+      # default-bucket: "your-default-bucket"
+      
+      # Optional: GCP location/region (defaults to us-central1)
+      location: "us-central1"
+      
+      # Optional: Default storage class (defaults to STANDARD)
+      # Valid values: STANDARD, NEARLINE, COLDLINE, ARCHIVE
+      storage-class: "STANDARD"
+      
+      # Optional: Retry configuration
+      retry-enabled: true
+      max-retries: 3
+      
+      # Optional: Timeout configuration (in milliseconds)
+      timeout:
+        connection: 30000  # 30 seconds
+        read: 60000        # 60 seconds  
+        write: 120000      # 2 minutes
+      
+      # Optional: Security configuration
+      security:
+        encryption-enabled: true
+        uniform-bucket-level-access: true
+        # kms-key-name: "projects/PROJECT_ID/locations/LOCATION/keyRings/RING_ID/cryptoKeys/KEY_ID"
+
+# Example configuration for consuming projects:
+# infra:
+#   cloud:
+#     gcp:
+#       project-id: "my-gcp-project"
+#       credentials-path: "/etc/gcp/service-account.json"
+#       default-bucket: "my-app-storage"
+#       location: "us-east1"
+#       storage-class: "STANDARD"
+
+logging:
+  level:
+    org.infra.cloud: INFO
+    org.infra.cloud.gcp: DEBUG

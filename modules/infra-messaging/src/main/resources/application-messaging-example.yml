@@ -1,0 +1,160 @@
+# Example configuration for infra-messaging library
+# Copy relevant sections to your application.yml and customize as needed
+
+infra:
+  messaging:
+    # Enable/disable messaging module
+    enabled: true
+    
+    # Kafka Configuration
+    kafka:
+      # Enable/disable Kafka
+      enabled: true
+      # Kafka bootstrap servers (comma-separated for multiple brokers)
+      bootstrap-servers: localhost:9092
+      
+      # Producer Configuration
+      producer:
+        enabled: true
+        key-serializer: org.apache.kafka.common.serialization.StringSerializer
+        value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+        acks: all  # 0, 1, all
+        retries: 3
+        batch-size: 16384
+        linger-ms: 5
+        buffer-memory: 33554432
+        request-timeout: PT30S
+        # Additional producer properties
+        properties:
+          compression.type: gzip
+          max.in.flight.requests.per.connection: 5
+          enable.idempotence: true
+      
+      # Consumer Configuration
+      consumer:
+        enabled: true
+        group-id: my-application-group
+        key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+        auto-offset-reset: earliest  # earliest, latest, none
+        enable-auto-commit: false
+        session-timeout: PT30S
+        heartbeat-interval: PT3S
+        max-poll-records: 500
+        max-poll-interval: PT5M
+        concurrency: 3
+        # Additional consumer properties
+        properties:
+          fetch.min.bytes: 1
+          fetch.max.wait.ms: 500
+      
+      # Security Configuration
+      security:
+        protocol: PLAINTEXT  # PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL
+        # sasl-mechanism: PLAIN  # PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI
+        # username: kafka-user
+        # password: kafka-password
+        # sasl-jaas-config: org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="password";
+        ssl:
+          # truststore-location: /path/to/kafka.client.truststore.jks
+          # truststore-password: truststore-password
+          # keystore-location: /path/to/kafka.client.keystore.jks
+          # keystore-password: keystore-password
+          # key-password: key-password
+      
+      # Dead Letter Queue Configuration
+      dlq:
+        enabled: true
+        topic-suffix: .dlq
+        max-retries: 3
+        retry-interval: PT1S
+        backoff-multiplier: 2.0
+        max-backoff-interval: PT5M
+      
+      # Additional Kafka properties
+      properties:
+        # Any additional Kafka client properties
+        # client.id: my-application
+        # metadata.max.age.ms: 300000
+    
+    # RabbitMQ Configuration
+    rabbitmq:
+      # Enable/disable RabbitMQ
+      enabled: true
+      host: localhost
+      port: 5672
+      username: guest
+      password: guest
+      virtual-host: /
+      connection-timeout: PT60S
+      requested-heartbeat: PT60S
+      
+      # Publisher Configuration
+      publisher:
+        enabled: true
+        confirm-enabled: true
+        confirm-timeout: PT5S
+        return-enabled: true
+        retries: 3
+        retry-interval: PT1S
+      
+      # Consumer Configuration
+      consumer:
+        enabled: true
+        concurrency: 2
+        max-concurrency: 10
+        prefetch-count: 250
+        tx-size: 1
+        acknowledge-mode: AUTO  # NONE, MANUAL, AUTO
+        auto-startup: true
+        receive-timeout: PT1S
+        recovery-interval: PT5S
+      
+      # Exchange Configuration
+      exchange:
+        default-name: my.application.exchange
+        type: topic  # direct, topic, fanout, headers
+        durable: true
+        auto-delete: false
+        arguments:
+          # x-message-ttl: 3600000  # 1 hour in milliseconds
+      
+      # Queue Configuration
+      queue:
+        default-name: my.application.queue
+        durable: true
+        exclusive: false
+        auto-delete: false
+        arguments:
+          # x-message-ttl: 3600000  # 1 hour in milliseconds
+          # x-max-length: 10000
+      
+      # Dead Letter Queue Configuration
+      dlq:
+        enabled: true
+        exchange-suffix: .dlx
+        queue-suffix: .dlq
+        routing-key-suffix: .dlq
+        max-retries: 3
+        retry-interval: PT1S
+        message-ttl: PT24H
+      
+      # SSL Configuration
+      ssl:
+        enabled: false
+        algorithm: TLSv1.2
+        # keystore-location: /path/to/keystore.p12
+        # keystore-password: keystore-password
+        # truststore-location: /path/to/truststore.jks
+        # truststore-password: truststore-password
+        validate-server-certificate: true
+        verify-hostname: true
+
+# Logging configuration for messaging
+logging:
+  level:
+    org.infra.messaging: DEBUG
+    org.springframework.kafka: INFO
+    org.springframework.amqp: INFO
+    org.apache.kafka: WARN
+    com.rabbitmq: WARN
