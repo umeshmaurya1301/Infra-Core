@@ -4,6 +4,7 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -65,6 +66,9 @@ public class InfraKafkaProperties {
 
     @NestedConfigurationProperty
     private ShutdownProperties shutdown = new ShutdownProperties();
+
+    @NestedConfigurationProperty
+    private CircuitBreakerProperties circuitBreaker = new CircuitBreakerProperties();
 
     // ─────────────────────────────────────────────────────────────────────────
     // Inner property classes
@@ -351,6 +355,16 @@ public class InfraKafkaProperties {
          * Maximum time (as a Duration string, e.g. {@code 30s}) to wait for
          * in-flight messages to drain before forceful shutdown.
          */
-        private String timeout = "30s";
+        private Duration timeout = Duration.ofSeconds(30);
+    }
+
+    /** Circuit breaker settings. */
+    @Data
+    public static class CircuitBreakerProperties {
+        /**
+         * Enable Resilience4j circuit breaking on consumer downstream failures.
+         * Default is false to avoid pausing consumption unexpectedly.
+         */
+        private boolean enabled = false;
     }
 }

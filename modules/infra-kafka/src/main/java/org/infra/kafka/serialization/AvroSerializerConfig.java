@@ -10,6 +10,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.infra.kafka.autoconfigure.InfraKafkaProperties;
+import org.infra.kafka.security.KafkaSecurityConfig;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -71,9 +72,11 @@ import java.util.Map;
 public class AvroSerializerConfig {
 
     private final InfraKafkaProperties properties;
+    private final KafkaSecurityConfig securityConfig;
 
-    public AvroSerializerConfig(InfraKafkaProperties properties) {
+    public AvroSerializerConfig(InfraKafkaProperties properties, KafkaSecurityConfig securityConfig) {
         this.properties = properties;
+        this.securityConfig = securityConfig;
         log.info("[infra-kafka] Avro serialization mode ACTIVE — Schema Registry: {}",
                 properties.getSerialization().getSchemaRegistryUrl());
     }
@@ -150,6 +153,9 @@ public class AvroSerializerConfig {
         config.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, producer.getRequestTimeoutMs());
         config.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, producer.getDeliveryTimeoutMs());
 
+        // ── Phase 6: Apply security settings ─────────────────────────────────
+        securityConfig.applySecurity(config);
+
         return config;
     }
 
@@ -165,7 +171,16 @@ public class AvroSerializerConfig {
     public ProducerFactory<String, Object> avroProducerFactory() {
         log.info("[infra-kafka] Avro ProducerFactory created — schema-registry={}",
                 properties.getSerialization().getSchemaRegistryUrl());
-        return new DefaultKafkaProducerFactory<>(avroProducerConfigs());
+        DefaultKafkaProducerFactory<String, Object> factory =
+                new DefaultKafkaProducerFactory<>(avroProducerConfigs());
+
+        if (properties.getTransaction().isEnabled()) {
+            factory.setTransactionIdPrefix(properties.getTransaction().getIdPrefix());
+            log.info("[infra-kafka] Transaction mode ENABLED. Avro ProducerFactory initialized with prefix: {}",
+                    properties.getTransaction().getIdPrefix());
+        }
+
+        return factory;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -198,6 +213,12 @@ public class AvroSerializerConfig {
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, consumer.isEnableAutoCommit());
         config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, consumer.getMaxPollRecords());
 
+        // ── Phase 7: Transactions / EOS ──────────────────────────────────────
+        if (properties.getTransaction().isEnabled()) {
+            config.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
+            log.info("[infra-kafka] Transaction mode ENABLED. Avro Consumer isolation.level set to read_committed.");
+        }
+
         // ── Partition assignment ─────────────────────────────────────────────
         config.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG,
                 consumer.getPartitionAssignmentStrategy());
@@ -226,6 +247,9 @@ public class AvroSerializerConfig {
 
         log.info("[infra-kafka] Avro ConsumerFactory config built — groupId={}, schema-registry={}",
                 consumer.getGroupId(), serialization.getSchemaRegistryUrl());
+
+        // ── Phase 6: Apply security settings ─────────────────────────────────
+        securityConfig.applySecurity(config);
 
         return config;
     }

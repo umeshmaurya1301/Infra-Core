@@ -3,11 +3,14 @@ package org.infra.kafka.producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.infra.kafka.autoconfigure.InfraKafkaProperties;
 import org.infra.kafka.observability.KafkaLoggingInterceptor;
+import org.infra.kafka.security.KafkaSecurityConfig;
+import org.infra.kafka.security.SaslConfigProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 
 import java.util.Map;
 
@@ -17,7 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class KafkaProducerConfigTest {
 
     private KafkaProducerConfig buildConfig(InfraKafkaProperties props) {
-        return new KafkaProducerConfig(props);
+        KafkaSecurityConfig securityConfig = new KafkaSecurityConfig(props, new SaslConfigProvider());
+        return new KafkaProducerConfig(props, securityConfig);
     }
 
     private InfraKafkaProperties defaultProperties() {
@@ -185,5 +189,23 @@ class KafkaProducerConfigTest {
         assertThat(configs).containsEntry(
                 ProducerConfig.INTERCEPTOR_CLASSES_CONFIG,
                 KafkaLoggingInterceptor.class.getName());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Transactions
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("infraKafkaProducerFactory() sets transactionIdPrefix when transactions are enabled")
+    void infraKafkaProducerFactory_setsTransactionIdPrefix() {
+        InfraKafkaProperties props = defaultProperties();
+        props.getTransaction().setEnabled(true);
+        props.getTransaction().setIdPrefix("test-txn-");
+
+        KafkaProducerConfig config = buildConfig(props);
+        DefaultKafkaProducerFactory<String, Object> factory =
+                (DefaultKafkaProducerFactory<String, Object>) config.infraKafkaProducerFactory(noInterceptor());
+
+        assertThat(factory.getTransactionIdPrefix()).isEqualTo("test-txn-");
     }
 }

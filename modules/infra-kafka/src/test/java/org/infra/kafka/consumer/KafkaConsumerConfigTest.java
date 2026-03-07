@@ -3,6 +3,8 @@ package org.infra.kafka.consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.infra.kafka.autoconfigure.InfraKafkaProperties;
 import org.infra.kafka.error.DefaultKafkaErrorHandler;
+import org.infra.kafka.security.KafkaSecurityConfig;
+import org.infra.kafka.security.SaslConfigProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -13,6 +15,7 @@ import org.springframework.kafka.listener.RecordInterceptor;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 
+import java.time.Duration;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,7 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class KafkaConsumerConfigTest {
 
     private KafkaConsumerConfig buildConfig(InfraKafkaProperties props) {
-        return new KafkaConsumerConfig(props);
+        KafkaSecurityConfig securityConfig = new KafkaSecurityConfig(props, new SaslConfigProvider());
+        return new KafkaConsumerConfig(props, securityConfig);
     }
 
     private InfraKafkaProperties defaultProperties() {
@@ -157,6 +161,41 @@ class KafkaConsumerConfigTest {
 
         assertThat(configs)
                 .containsEntry(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Phase 7: Transactions
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("consumerConfigs() sets isolation.level to read_committed when transaction enabled")
+    void consumerConfigs_setsIsolationLevel_whenTransactionEnabled() {
+        InfraKafkaProperties props = defaultProperties();
+        props.getTransaction().setEnabled(true);
+
+        Map<String, Object> configs = buildConfig(props).consumerConfigs();
+
+        assertThat(configs).containsEntry(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Phase 8: Hardening & Shutdown
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("infraKafkaListenerContainerFactory() maps shutdown timeout from properties correctly")
+    void infraKafkaListenerContainerFactory_mapsShutdownTimeout() {
+        InfraKafkaProperties props = defaultProperties();
+        props.getShutdown().setTimeout(Duration.ofSeconds(45));
+
+        KafkaConsumerConfig config = buildConfig(props);
+        ConsumerFactory<String, Object> consumerFactory = config.infraKafkaConsumerFactory();
+        ConcurrentKafkaListenerContainerFactory<String, Object> listenerFactory =
+                config.infraKafkaListenerContainerFactory(
+                        consumerFactory, emptyErrorHandlerProvider(), emptyRecordInterceptorProvider());
+
+        assertThat(listenerFactory.getContainerProperties().getShutdownTimeout())
+                .isEqualTo(45000L);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

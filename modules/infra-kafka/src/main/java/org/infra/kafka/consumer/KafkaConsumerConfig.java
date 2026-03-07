@@ -5,6 +5,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.infra.kafka.autoconfigure.InfraKafkaProperties;
 import org.infra.kafka.error.DefaultKafkaErrorHandler;
+import org.infra.kafka.security.KafkaSecurityConfig;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -51,9 +52,11 @@ import java.util.Map;
 public class KafkaConsumerConfig {
 
     private final InfraKafkaProperties properties;
+    private final KafkaSecurityConfig securityConfig;
 
-    public KafkaConsumerConfig(InfraKafkaProperties properties) {
+    public KafkaConsumerConfig(InfraKafkaProperties properties, KafkaSecurityConfig securityConfig) {
         this.properties = properties;
+        this.securityConfig = securityConfig;
     }
 
     /**
@@ -107,6 +110,15 @@ public class KafkaConsumerConfig {
                 consumer.getConcurrency(),
                 consumer.isEnableAutoCommit());
 
+        // ── Phase 7: Transactions / EOS ──────────────────────────────────────
+        if (properties.getTransaction().isEnabled()) {
+            config.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
+            log.info("[infra-kafka] Transaction mode ENABLED. Consumer isolation.level set to read_committed.");
+        }
+
+        // ── Phase 6: Apply security settings ─────────────────────────────────
+        securityConfig.applySecurity(config);
+
         return config;
     }
 
@@ -159,6 +171,11 @@ public class KafkaConsumerConfig {
 
         // RECORD ack-mode: commit offset after each record (safe default)
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
+
+        // Phase 8: Graceful shutdown max timeout waiting for in-flight records bounds
+        if (properties.getShutdown().getTimeout() != null) {
+            factory.getContainerProperties().setShutdownTimeout(properties.getShutdown().getTimeout().toMillis());
+        }
 
         // Phase 3: wire the error handler when the bean is present in the context
         errorHandler.ifAvailable(handler -> {

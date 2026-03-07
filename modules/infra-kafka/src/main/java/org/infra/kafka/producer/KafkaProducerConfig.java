@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.infra.kafka.autoconfigure.InfraKafkaProperties;
 import org.infra.kafka.observability.KafkaLoggingInterceptor;
+import org.infra.kafka.security.KafkaSecurityConfig;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -49,9 +50,11 @@ import java.util.Map;
 public class KafkaProducerConfig {
 
     private final InfraKafkaProperties properties;
+    private final KafkaSecurityConfig securityConfig;
 
-    public KafkaProducerConfig(InfraKafkaProperties properties) {
+    public KafkaProducerConfig(InfraKafkaProperties properties, KafkaSecurityConfig securityConfig) {
         this.properties = properties;
+        this.securityConfig = securityConfig;
     }
 
     /**
@@ -131,6 +134,9 @@ public class KafkaProducerConfig {
             log.info("[infra-kafka] KafkaLoggingInterceptor registered on producer");
         });
 
+        // ── Phase 6: Apply security settings ─────────────────────────────────
+        securityConfig.applySecurity(config);
+
         return config;
     }
 
@@ -148,6 +154,13 @@ public class KafkaProducerConfig {
             ObjectProvider<KafkaLoggingInterceptor> loggingInterceptor) {
         DefaultKafkaProducerFactory<String, Object> factory =
                 new DefaultKafkaProducerFactory<>(producerConfigs(loggingInterceptor));
+
+        if (properties.getTransaction().isEnabled()) {
+            factory.setTransactionIdPrefix(properties.getTransaction().getIdPrefix());
+            log.info("[infra-kafka] Transaction mode ENABLED. ProducerFactory initialized with prefix: {}",
+                    properties.getTransaction().getIdPrefix());
+        }
+
         log.info("[infra-kafka] ProducerFactory initialized with bootstrap-servers={}",
                 properties.getBootstrapServers());
         return factory;
