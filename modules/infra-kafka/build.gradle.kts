@@ -1,6 +1,7 @@
 plugins {
     id("java")
     id("maven-publish")
+    id("jacoco")
 }
 
 description = "Reusable Spring Boot Kafka library — idempotent producer, consumer, retry/DLQ, observability, Avro"
@@ -84,4 +85,20 @@ publishing {
             }
         }
     }
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport)
 }
