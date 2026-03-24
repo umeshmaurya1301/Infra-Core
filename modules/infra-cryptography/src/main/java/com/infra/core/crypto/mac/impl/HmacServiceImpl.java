@@ -49,7 +49,7 @@ public class HmacServiceImpl implements HmacService {
 
         try {
             // New Mac instance per call — Mac is NOT thread-safe.
-            Mac mac = Mac.getInstance(algorithm.getAlgorithmName());
+            Mac mac = Mac.getInstance(algorithm.getJcaName());
             mac.init(resolveKey(macKey, algorithm));
             return mac.doFinal(payload);
         } catch (NoSuchAlgorithmException e) {
@@ -96,6 +96,6 @@ public class HmacServiceImpl implements HmacService {
             throw new CryptographyException(
                     "MAC key does not expose encoded bytes — cannot use with algorithm " + algorithm.name());
         }
-        return new SecretKeySpec(keyBytes, algorithm.getAlgorithmName());
+        return new SecretKeySpec(keyBytes, algorithm.getJcaName());
     }
 }

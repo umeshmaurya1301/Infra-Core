@@ -1,7 +1,9 @@
 package com.infra.core.crypto.config;
 
 import com.infra.core.crypto.enums.*;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
+@ConfigurationProperties(prefix = "infra.crypto")
 public class InfraCryptoProperties {
 
     private final HashingProperties hashing = new HashingProperties();
