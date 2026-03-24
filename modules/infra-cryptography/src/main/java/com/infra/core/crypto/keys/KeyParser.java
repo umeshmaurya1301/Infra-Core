@@ -104,6 +104,13 @@ public final class KeyParser {
             return generatePublicKey(new X509EncodedKeySpec(pemObject.getContent()), algorithm);
         } catch (IOException e) {
             throw new KeyParsingException("Failed to parse PEM string", e);
+        } catch (KeyParsingException e) {
+            // Re-throw domain exceptions from generatePublicKey — they must not be double-wrapped.
+            throw e;
+        } catch (RuntimeException e) {
+            // BouncyCastle's PemReader throws DecoderException (unchecked) for malformed Base64.
+            // Wrapping generically to avoid coupling to BC-specific exception types.
+            throw new KeyParsingException("Failed to decode PEM content", e);
         }
     }
 
@@ -126,6 +133,11 @@ public final class KeyParser {
             return generatePrivateKey(new PKCS8EncodedKeySpec(pemObject.getContent()), algorithm);
         } catch (IOException e) {
             throw new KeyParsingException("Failed to parse PEM string", e);
+        } catch (KeyParsingException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            // BouncyCastle's PemReader throws DecoderException (unchecked) for malformed Base64.
+            throw new KeyParsingException("Failed to decode PEM content", e);
         }
     }
 
