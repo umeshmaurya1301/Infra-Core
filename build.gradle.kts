@@ -27,6 +27,7 @@ extra["commonsCollections4Version"] = "4.4"
 extra["commonsIoVersion"] = "2.18.0"
 extra["guavaVersion"] = "33.3.1-jre"
 extra["mapstructVersion"] = "1.6.3"
+extra["jedisVersion"] = "6.0.0"
 
 allprojects {
     group = "org.infra"

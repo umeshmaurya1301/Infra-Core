@@ -8,7 +8,8 @@ include(
     "infra-cryptography",
     "infra-audit",
     "infra-validation",
-    "infra-kafka"
+    "infra-kafka",
+    "infra-redis"
 )
 
 // Set project directories
@@ -19,3 +20,4 @@ project(":infra-cryptography").projectDir = file("modules/infra-cryptography")
 project(":infra-audit").projectDir = file("modules/infra-audit")
 project(":infra-validation").projectDir = file("modules/infra-validation")
 project(":infra-kafka").projectDir = file("modules/infra-kafka")
+project(":infra-redis").projectDir = file("modules/infra-redis")
