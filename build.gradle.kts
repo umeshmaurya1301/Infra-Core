@@ -59,12 +59,25 @@ subprojects {
         // ======================
         // Implementation
         // ======================
-        implementation("org.springframework.boot:spring-boot-starter")
-        implementation("org.springframework.boot:spring-boot-starter-web")
-        implementation("org.springframework.boot:spring-boot-starter-actuator")
-        implementation("org.springframework.boot:spring-boot-starter-validation")
-        implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-
+        //
+        // Deliberately NO blanket spring-boot-starter/-web/-actuator/-validation/
+        // -data-jpa here. Every module below scopes its own Boot-starter needs as
+        // `compileOnly` (matching the payorch originals this was ported from) so
+        // a consumer only gets what it actually asked for. A forced `implementation`
+        // here previously leaked spring-boot-starter-data-jpa onto the runtime
+        // classpath of every consumer of every starter - including services with
+        // no JPA at all - and Spring Boot tried to auto-configure a DataSource for
+        // them at startup and failed. See infra-web/infra-resilience/infra-chaos/
+        // infra-observability's own build.gradle.kts for the real per-module list.
+        //
+        // spring-boot-autoconfigure IS kept, universally - every starter here is
+        // an autoconfiguration provider (@AutoConfiguration, @Bean, @Value,
+        // @ConditionalOnProperty classes), and this is the one artifact that
+        // supplies those types at compile time without pulling in anything that
+        // actually activates at runtime (no @ConditionalOnClass here matches
+        // unless the consumer's own classpath already has the real starter).
+        implementation("org.springframework.boot:spring-boot-autoconfigure")
+        annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
         // Explicit versions here (using the extras already declared above),
         // unlike the Boot starters: a module whose ENTIRE published dependency

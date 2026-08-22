@@ -34,6 +34,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-configuration-processor")
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
+    // KafkaMetricsConfig/ObservabilityConfig (io.micrometer.core.instrument.*) and
+    // SchemaRegistryHealthIndicator (org.springframework.boot.health.contributor.*).
+    implementation("io.micrometer:micrometer-core")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+
     // ── JSON ──────────────────────────────────────────────────────────────
     implementation("tools.jackson.core:jackson-databind")
 

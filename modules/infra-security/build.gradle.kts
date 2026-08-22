@@ -11,6 +11,8 @@ dependencies {
     
     // Spring Security using centralized versions
     implementation("org.springframework.boot:spring-boot-starter-security")
+    // SpringSecurityAuditorAware implements AuditorAware, from spring-data-commons.
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.security:spring-security-oauth2-resource-server")
     implementation("org.springframework.security:spring-security-oauth2-jose")
     
