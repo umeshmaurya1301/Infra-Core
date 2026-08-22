@@ -10,7 +10,7 @@ plugins {
 extra["springBootVersion"] = "4.1.1"
 extra["springSecurityVersion"] = "6.4.1"
 extra["slf4jVersion"] = "2.0.16"
-extra["logbackVersion"] = "1.5.14"
+extra["logbackVersion"] = "1.5.38" // matches what spring-boot-starter-logging:4.1.1 actually requires
 extra["postgresqlVersion"] = "42.7.4"
 extra["h2Version"] = "2.3.232"
 extra["jjwtVersion"] = "0.12.6"
@@ -66,8 +66,14 @@ subprojects {
         implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 
 
-        implementation("org.slf4j:slf4j-api")
-        implementation("ch.qos.logback:logback-classic")
+        // Explicit versions here (using the extras already declared above),
+        // unlike the Boot starters: a module whose ENTIRE published dependency
+        // set is unversioned fails generateMetadataFileForMavenPublication with
+        // "Publication only contains dependencies ... without a version" - hit
+        // by infra-idempotency, which has no module-specific published deps of
+        // its own beyond what is declared here.
+        implementation("org.slf4j:slf4j-api:${property("slf4jVersion")}")
+        implementation("ch.qos.logback:logback-classic:${property("logbackVersion")}")
         implementation("tools.jackson.core:jackson-databind")
 
         // ======================
