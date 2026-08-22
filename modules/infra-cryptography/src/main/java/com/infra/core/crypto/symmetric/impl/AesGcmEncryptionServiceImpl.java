@@ -52,7 +52,7 @@ import java.security.SecureRandom;
  * on every encrypt/decrypt call — no caching, no {@code ThreadLocal}. {@link SecureRandom}
  * IS thread-safe and is intentionally shared as a static final singleton.</p>
  *
- * <h2>Key Resolution & Rotation</h2>
+ * <h2>Key Resolution &amp; Rotation</h2>
  * <p>Encryption always fetches the ACTIVE key from the {@link SymmetricKeyProvider}.
  * Decryption reads the KID from the payload header and fetches the HISTORICAL key by ID,
  * enabling seamless decryption of ciphertexts that were encrypted with rotated-out keys.</p>

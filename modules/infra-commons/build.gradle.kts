@@ -21,8 +21,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     
     // JSON processing
-    implementation("com.fasterxml.jackson.core:jackson-databind")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+    implementation("tools.jackson.core:jackson-databind")
     
     // Configuration properties
     implementation("org.springframework.boot:spring-boot-configuration-processor")

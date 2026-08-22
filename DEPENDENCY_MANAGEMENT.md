@@ -121,15 +121,17 @@ infra-core/
 // NO manual version needed
 implementation("org.springframework.boot:spring-boot-starter")
 implementation("org.projectlombok:lombok")
-implementation("com.fasterxml.jackson.core:jackson-databind")
+implementation("tools.jackson.core:jackson-databind")
+implementation("org.junit.jupiter:junit-jupiter")
+implementation("org.mockito:mockito-core")
+implementation("org.assertj:assertj-core")
 implementation("org.slf4j:slf4j-api")
 ```
 
 #### 2. **Centralized Manual Management**
 ```kotlin
 // These versions are manually managed in root build.gradle.kts
-extra["springBootVersion"] = "3.4.2"
-extra["springCloudVersion"] = "2024.0.0"
+extra["springBootVersion"] = "4.1.1"
 extra["postgresqlVersion"] = "42.7.4"
 extra["jjwtVersion"] = "0.12.6"
 extra["bouncyCastleVersion"] = "1.79"
@@ -151,7 +153,6 @@ implementation("io.jsonwebtoken:jjwt-api:${property("jjwtVersion")}")
 the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
     imports {
         mavenBom("org.springframework.boot:spring-boot-dependencies:${property("springBootVersion")}")
-        mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
     }
 }
 ```
@@ -388,13 +389,12 @@ dependencies {
 ```kotlin
 plugins {
     id("java")
-    id("org.springframework.boot") version "3.4.2" apply false
-    id("io.spring.dependency-management") version "1.1.6" apply false
+    id("org.springframework.boot") version "4.1.1" apply false
+    id("io.spring.dependency-management") version "1.1.7" apply false
 }
 
 // Centralized versions
-extra["springBootVersion"] = "3.4.2"
-extra["springCloudVersion"] = "2024.0.0"
+extra["springBootVersion"] = "4.1.1"
 // ... more versions
 
 allprojects {
@@ -580,8 +580,7 @@ ls -la ~/.m2/repository/org/infra/
 #### 1. **Spring Boot Updates**
 ```kotlin
 // Update in root build.gradle.kts
-extra["springBootVersion"] = "3.4.3" // New version
-extra["springCloudVersion"] = "2024.0.1" // Compatible version
+extra["springBootVersion"] = "4.1.2" // New version
 ```
 
 #### 2. **External Dependency Updates**
@@ -603,12 +602,11 @@ extra["jjwtVersion"] = "0.12.7"
 
 ### Update Process
 1. **Update Spring Boot version** in root `build.gradle.kts`
-2. **Update compatible Spring Cloud version**
-3. **Test build** with `./gradlew clean build`
-4. **Test publishing** with `./gradlew publishToMavenLocal`
-5. **Update external dependencies** if needed
-6. **Verify all tests pass**
-7. **Commit changes** with clear version update message
+2. **Test build** with `./gradlew clean build`
+3. **Test publishing** with `./gradlew publishToMavenLocal`
+4. **Update external dependencies** if needed
+5. **Verify all tests pass**
+6. **Commit changes** with clear version update message
 
 ### Monitoring and Alerts
 - **Security Updates**: Monitor Spring Boot security advisories

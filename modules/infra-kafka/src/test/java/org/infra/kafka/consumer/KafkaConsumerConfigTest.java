@@ -1,6 +1,7 @@
 package org.infra.kafka.consumer;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.infra.kafka.autoconfigure.InfraKafkaProperties;
 import org.infra.kafka.error.DefaultKafkaErrorHandler;
 import org.infra.kafka.security.KafkaSecurityConfig;
@@ -12,8 +13,9 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.RecordInterceptor;
+import org.springframework.kafka.support.converter.ByteArrayJacksonJsonMessageConverter;
+import org.springframework.kafka.support.converter.RecordMessageConverter;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
 
 import java.time.Duration;
 import java.util.Map;
@@ -133,34 +135,35 @@ class KafkaConsumerConfigTest {
     }
 
     @Test
-    @DisplayName("consumerConfigs() wraps value deserializer in ErrorHandlingDeserializer")
-    void consumerConfigs_wrapsValueDeserializerInErrorHandling() {
+    @DisplayName("consumerConfigs() reads the value as raw byte[] (typed by the message converter)")
+    void consumerConfigs_usesByteArrayValueDeserializer() {
+        // The value is deserialized to byte[]; JSON binding to the listener's payload type is done
+        // by the ByteArrayJacksonJsonMessageConverter on the factory (type inferred from the method).
         Map<String, Object> configs = buildConfig(defaultProperties()).consumerConfigs();
 
         assertThat(configs)
                 .containsEntry(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                        ErrorHandlingDeserializer.class);
+                        ByteArrayDeserializer.class);
     }
 
     @Test
-    @DisplayName("consumerConfigs() sets trusted packages for JsonDeserializer")
-    void consumerConfigs_setsTrustedPackages() {
-        InfraKafkaProperties props = defaultProperties();
-        props.getConsumer().setTrustedPackages("com.example.*");
+    @DisplayName("infraKafkaMessageConverter() creates a ByteArrayJacksonJsonMessageConverter")
+    void infraKafkaMessageConverter_createsByteArrayJsonConverter() {
+        RecordMessageConverter converter = buildConfig(defaultProperties()).infraKafkaMessageConverter();
 
-        Map<String, Object> configs = buildConfig(props).consumerConfigs();
-
-        assertThat(configs)
-                .containsEntry(JsonDeserializer.TRUSTED_PACKAGES, "com.example.*");
+        assertThat(converter).isInstanceOf(ByteArrayJacksonJsonMessageConverter.class);
     }
 
     @Test
-    @DisplayName("consumerConfigs() disables type header usage in JsonDeserializer")
-    void consumerConfigs_disablesTypeInfoHeaders() {
-        Map<String, Object> configs = buildConfig(defaultProperties()).consumerConfigs();
+    @DisplayName("infraKafkaMessageConverter() is created regardless of trusted-packages value")
+    void infraKafkaMessageConverter_secureDefaultAndWildcard() {
+        // Secure default (empty) and explicit dev-only "*" both yield a usable converter;
+        // trusted packages are applied to the converter's type mapper (header-fallback defence).
+        assertThat(buildConfig(defaultProperties()).infraKafkaMessageConverter()).isNotNull();
 
-        assertThat(configs)
-                .containsEntry(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        InfraKafkaProperties wildcard = defaultProperties();
+        wildcard.getConsumer().setTrustedPackages("*");
+        assertThat(buildConfig(wildcard).infraKafkaMessageConverter()).isNotNull();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -192,7 +195,8 @@ class KafkaConsumerConfigTest {
         ConsumerFactory<String, Object> consumerFactory = config.infraKafkaConsumerFactory();
         ConcurrentKafkaListenerContainerFactory<String, Object> listenerFactory =
                 config.infraKafkaListenerContainerFactory(
-                        consumerFactory, emptyErrorHandlerProvider(), emptyRecordInterceptorProvider());
+                        consumerFactory, config.infraKafkaMessageConverter(),
+                        emptyErrorHandlerProvider(), emptyRecordInterceptorProvider());
 
         assertThat(listenerFactory.getContainerProperties().getShutdownTimeout())
                 .isEqualTo(45000L);
@@ -218,7 +222,8 @@ class KafkaConsumerConfigTest {
         ConsumerFactory<String, Object> consumerFactory = config.infraKafkaConsumerFactory();
         ConcurrentKafkaListenerContainerFactory<String, Object> listenerFactory =
                 config.infraKafkaListenerContainerFactory(
-                        consumerFactory, emptyErrorHandlerProvider(), emptyRecordInterceptorProvider());
+                        consumerFactory, config.infraKafkaMessageConverter(),
+                        emptyErrorHandlerProvider(), emptyRecordInterceptorProvider());
 
         assertThat(listenerFactory).isNotNull();
     }
@@ -233,7 +238,8 @@ class KafkaConsumerConfigTest {
         ConsumerFactory<String, Object> consumerFactory = config.infraKafkaConsumerFactory();
         ConcurrentKafkaListenerContainerFactory<String, Object> listenerFactory =
                 config.infraKafkaListenerContainerFactory(
-                        consumerFactory, emptyErrorHandlerProvider(), emptyRecordInterceptorProvider());
+                        consumerFactory, config.infraKafkaMessageConverter(),
+                        emptyErrorHandlerProvider(), emptyRecordInterceptorProvider());
 
         // Factory creation succeeds when concurrency override is applied
         assertThat(listenerFactory).isNotNull();
@@ -246,7 +252,8 @@ class KafkaConsumerConfigTest {
         ConsumerFactory<String, Object> consumerFactory = config.infraKafkaConsumerFactory();
         ConcurrentKafkaListenerContainerFactory<String, Object> listenerFactory =
                 config.infraKafkaListenerContainerFactory(
-                        consumerFactory, emptyErrorHandlerProvider(), emptyRecordInterceptorProvider());
+                        consumerFactory, config.infraKafkaMessageConverter(),
+                        emptyErrorHandlerProvider(), emptyRecordInterceptorProvider());
 
         assertThat(listenerFactory.getContainerProperties().getAckMode())
                 .isEqualTo(ContainerProperties.AckMode.RECORD);

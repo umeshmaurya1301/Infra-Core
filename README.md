@@ -170,9 +170,9 @@ The project uses centralized version management in `gradle/libs.versions.toml` a
 
 ## 🔧 **Requirements**
 
-- Java 17+
-- Gradle 8.x+
-- Spring Boot 3.4.2+
+- Java 25+
+- Gradle 9.x+
+- Spring Boot 4.1.1+
 
 ## 🎯 **Key Features**
 

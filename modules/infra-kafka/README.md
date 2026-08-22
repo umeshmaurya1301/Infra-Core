@@ -243,7 +243,8 @@ modules/infra-kafka/
 | Idempotent producer | ✅ ON | `infra.kafka.producer.idempotent` |
 | JSON serialization | ✅ ON | `infra.kafka.serialization.type` |
 | Avro serialization | ❌ OFF | `infra.kafka.serialization.type=avro` |
-| Non-blocking retry | ✅ ON (3 attempts) | `infra.kafka.retry.*` |
+| Blocking retry (in-memory backoff) | ✅ ON (3 attempts, default mode) | `infra.kafka.retry.*` |
+| Non-blocking retry (retry topics) | ⚙️ Opt-in | `infra.kafka.retry.mode=non-blocking` |
 | Dead Letter Queue | ✅ ON | `infra.kafka.dlq.*` |
 | Structured logging | ✅ ON | `infra.kafka.logging.*` |
 | Micrometer metrics | ✅ ON | `infra.kafka.metrics.enabled` |
@@ -463,16 +464,22 @@ infra:
       concurrency: 3                     # listener threads
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      trusted-packages: "com.yourcompany.*"
+      trusted-packages: "com.yourcompany.*"   # secure by default: empty trusts NOTHING; set your model package(s). "*" is dev-only.
       partition-assignment-strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
 
     # ── Retry ──
     retry:
       enabled: true
+      mode: blocking                     # blocking (default) | non-blocking
       max-attempts: 3
       backoff-initial-interval: 1000     # ms
       backoff-multiplier: 2.0
       backoff-max-interval: 10000        # ms
+      # Non-blocking (retry-topic) mode only:
+      retry-topic-suffix: "-retry"
+      auto-create-retry-topics: true
+      retry-topic-partitions: 1
+      retry-topic-replication-factor: 1
 
     # ── Dead Letter Queue ──
     dlq:
@@ -609,23 +616,51 @@ public class PaymentEventConsumer {
     }
 
     /**
-     * Consume with retry — on failure, message routes to retry topics then DLQ.
-     * Retry behavior is configured via application.yml (max-attempts, backoff).
+     * Consume with retry — the DEFAULT behaviour. On failure the record is retried
+     * with exponential backoff (configured via infra.kafka.retry.*) and then routed
+     * to the DLQ. No extra attribute is needed.
+     */
+    @InfraKafkaListener(topics = "inventory-events", groupId = "inventory-service")
+    public void handleInventory(@Payload InventoryEvent event) {
+        inventoryService.reserve(event);  // may throw → retried, then DLQ
+    }
+
+    /**
+     * Opt OUT of retries — failures go straight to the DLQ on the first exception.
+     * Useful for non-transient / non-retryable event types.
      */
     @InfraKafkaListener(
-        topics = "inventory-events",
+        topics = "audit-events",
         groupId = "inventory-service",
-        retryable = true     // enables non-blocking retry for this listener
+        containerFactory = InfraKafkaListener.NON_RETRYING_CONTAINER_FACTORY
     )
-    public void handleInventory(@Payload InventoryEvent event) {
-        inventoryService.reserve(event);  // may throw → triggers retry
+    public void handleAudit(@Payload AuditEvent event) {
+        auditService.record(event);  // may throw → straight to audit-events-dlq
     }
 }
 ```
 
+> **Note:** retry behaviour is a property of the container factory, so it is selected
+> per listener via `containerFactory`. The default (`RETRYING_CONTAINER_FACTORY`) retries
+> then DLQs; `NON_RETRYING_CONTAINER_FACTORY` sends failures straight to the DLQ. (This
+> replaces the earlier `retryable` flag, which had no effect.)
+
 ---
 
 ## 12. Retry & DLQ Flow
+
+### Retry modes
+
+The library supports two retry strategies, selected via `infra.kafka.retry.mode`:
+
+| Mode | `infra.kafka.retry.mode` | How it works | Trade-off |
+|------|--------------------------|--------------|-----------|
+| **Blocking** (default) | `blocking` | The container retries the record **in place** with an in-memory exponential backoff, then routes to the DLQ. | Simple; preserves per-partition ordering. But the partition is **paused** while a record backs off, so long backoffs stall the consumer. |
+| **Non-blocking** | `non-blocking` | Failed records are **forwarded to dedicated retry topics** (`<topic>-retry-0`, `-retry-1`, …) and re-consumed after a delay; exhausted records land in the DLT (`<topic>-dlq`). Built on Spring Kafka's `@RetryableTopic` infrastructure. | The original partition never blocks (higher throughput/availability). But retried records may be processed **out of order** relative to the source partition, and the cluster must allow retry/DLT topic creation. |
+
+**Non-blocking mode** additionally creates a `KafkaAdmin` (pointed at `infra.kafka.bootstrap-servers`) to auto-create the retry/DLT topics, controllable via `infra.kafka.retry.auto-create-retry-topics` / `retry-topic-partitions` / `retry-topic-replication-factor`. The per-listener `NON_RETRYING_CONTAINER_FACTORY` opt-out (see §11) applies to **blocking** mode; in non-blocking mode the retry-topic configuration governs all listeners globally.
+
+The diagram below illustrates the **non-blocking** retry-topic flow.
 
 ### Flow Diagram
 
@@ -950,10 +985,10 @@ Step 4: Verify cluster-wide
 
 ## 18. Common Pitfalls
 
-### ❌ Pitfall 1: Not setting `trusted.packages`
+### ❌ Pitfall 1: Not setting `trusted-packages`
 
-**Problem**: `JsonDeserializer` rejects messages from unknown packages.
-**Fix**: Set `infra.kafka.consumer.trusted-packages: "com.yourcompany.*"` or `"*"` (dev only).
+**Problem**: `trusted-packages` is **empty by default** (secure by default — no package is blanket-trusted). If you rely on type-info headers, `JsonDeserializer` rejects messages from untrusted packages.
+**Fix**: Set `infra.kafka.consumer.trusted-packages: "com.yourcompany.*"` to your event-model package(s). Avoid `"*"` outside local dev — it trusts every package and is a deserialization-attack vector; the library logs a `SECURITY` warning at startup when it sees `"*"`.
 
 ### ❌ Pitfall 2: Consumer concurrency > partition count
 
@@ -1255,8 +1290,7 @@ public class PaymentEventConsumer {
 
     @InfraKafkaListener(
         topics = "payment-events",
-        groupId = "order-service",
-        retryable = true
+        groupId = "order-service"
     )
     public void onPaymentCompleted(@Payload PaymentCompletedEvent event) {
         log.info("Payment completed for order: {}", event.orderId());

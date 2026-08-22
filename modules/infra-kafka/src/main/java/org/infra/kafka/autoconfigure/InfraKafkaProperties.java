@@ -118,7 +118,7 @@ public class InfraKafkaProperties {
         private String keySerializer = "org.apache.kafka.common.serialization.StringSerializer";
 
         /** Fully-qualified value serializer class name. */
-        private String valueSerializer = "org.springframework.kafka.support.serializer.JsonSerializer";
+        private String valueSerializer = "org.springframework.kafka.support.serializer.JacksonJsonSerializer";
 
         /** Maximum in-flight requests per connection. */
         private int maxInFlightRequestsPerConnection = 5;
@@ -152,22 +152,46 @@ public class InfraKafkaProperties {
         private String keyDeserializer = "org.apache.kafka.common.serialization.StringDeserializer";
 
         /** Fully-qualified value deserializer class name. */
-        private String valueDeserializer = "org.springframework.kafka.support.serializer.JsonDeserializer";
+        private String valueDeserializer = "org.springframework.kafka.support.serializer.JacksonJsonDeserializer";
 
         /**
-         * Comma-separated list of trusted packages for JsonDeserializer.
-         * Use {@code "*"} only in development environments.
+         * Comma-separated packages whose classes may be deserialized from JSON payloads.
+         *
+         * <p><b>Secure by default:</b> empty means no package is blanket-trusted — set this to
+         * your event-model package(s), e.g. {@code com.acme.orders.events}. A value of
+         * {@code "*"} trusts <em>every</em> package and is a deserialization-attack vector, so it
+         * is only appropriate for local development (the library logs a warning when it sees it).
+         *
+         * <p>When left empty the deserialization target type is taken from the listener method
+         * signature (type-info headers are disabled), so legitimate typed payloads still
+         * deserialize correctly.
          */
-        private String trustedPackages = "*";
+        private String trustedPackages = "";
 
         /** Partition assignment strategy class name. */
         private String partitionAssignmentStrategy =
                 "org.apache.kafka.clients.consumer.CooperativeStickyAssignor";
     }
 
-    /** Non-blocking retry settings. */
+    /** Retry settings (blocking in-memory backoff, or non-blocking retry topics). */
     @Data
     public static class RetryProperties {
+
+        /**
+         * Retry strategy.
+         * <ul>
+         *   <li>{@code BLOCKING} (default) — the container retries the record in place with
+         *       an in-memory backoff, then routes to the DLQ. Simple and preserves ordering,
+         *       but the partition is paused while a record backs off.</li>
+         *   <li>{@code NON_BLOCKING} — failed records are forwarded to per-attempt retry
+         *       topics ({@code <topic><retry-topic-suffix>}) and re-consumed after a delay,
+         *       so the original partition is never blocked. Exhausted records land in the DLT
+         *       ({@code <topic><dlq.suffix>}). Requires topic creation on the cluster.</li>
+         * </ul>
+         * Configure via {@code infra.kafka.retry.mode: non-blocking}.
+         */
+        private RetryMode mode = RetryMode.BLOCKING;
+
         /** Enable or disable retry altogether. */
         private boolean enabled = true;
 
@@ -182,6 +206,31 @@ public class InfraKafkaProperties {
 
         /** Maximum backoff delay cap in milliseconds. */
         private long backoffMaxInterval = 10000L;
+
+        // ── Non-blocking (retry-topic) specific settings ─────────────────────
+
+        /** Suffix used to name retry topics in {@code NON_BLOCKING} mode. */
+        private String retryTopicSuffix = "-retry";
+
+        /**
+         * Whether the library should auto-create the retry and DLT topics in
+         * {@code NON_BLOCKING} mode. Requires a {@code KafkaAdmin} and create permissions.
+         */
+        private boolean autoCreateRetryTopics = true;
+
+        /** Partition count for auto-created retry / DLT topics. */
+        private int retryTopicPartitions = 1;
+
+        /** Replication factor for auto-created retry / DLT topics. */
+        private short retryTopicReplicationFactor = 1;
+
+        /** Retry strategy for {@link RetryProperties#mode}. */
+        public enum RetryMode {
+            /** In-memory blocking backoff on the consuming container (default). */
+            BLOCKING,
+            /** Non-blocking retry via dedicated retry topics ({@code @RetryableTopic} infrastructure). */
+            NON_BLOCKING
+        }
     }
 
     /** Dead-letter queue settings. */

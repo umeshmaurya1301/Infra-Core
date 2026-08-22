@@ -1,20 +1,14 @@
 plugins {
     id("java")
-    id("org.springframework.boot") version "3.4.2" apply false
-    id("io.spring.dependency-management") version "1.1.6" apply false
+    id("org.springframework.boot") version "4.1.1" apply false
+    id("io.spring.dependency-management") version "1.1.7" apply false
 }
 
 // ===========================================
 // CENTRALIZED VERSION MANAGEMENT
 // ===========================================
-extra["springBootVersion"] = "3.4.2"
-extra["springCloudVersion"] = "2024.0.0"
+extra["springBootVersion"] = "4.1.1"
 extra["springSecurityVersion"] = "6.4.1"
-extra["junitVersion"] = "5.11.3"
-extra["mockitoVersion"] = "5.14.2"
-extra["assertjVersion"] = "3.26.3"
-extra["jacksonVersion"] = "2.18.2"
-extra["lombokVersion"] = "1.18.36"
 extra["slf4jVersion"] = "2.0.16"
 extra["logbackVersion"] = "1.5.14"
 extra["postgresqlVersion"] = "42.7.4"
@@ -49,8 +43,9 @@ subprojects {
     apply(plugin = "io.spring.dependency-management")
 
     java {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
+        }
         withJavadocJar()
         withSourcesJar()
     }
@@ -73,27 +68,27 @@ subprojects {
 
         implementation("org.slf4j:slf4j-api")
         implementation("ch.qos.logback:logback-classic")
-        implementation("com.fasterxml.jackson.core:jackson-databind")
+        implementation("tools.jackson.core:jackson-databind")
 
         // ======================
         // Compile Only / Annotation Processing
         // ======================
-        compileOnly("org.projectlombok:lombok:${property("lombokVersion")}")
-        annotationProcessor("org.projectlombok:lombok:${property("lombokVersion")}")
+        compileOnly("org.projectlombok:lombok")
+        annotationProcessor("org.projectlombok:lombok")
 
         // ======================
         // Testing
         // ======================
         testImplementation("org.springframework.boot:spring-boot-starter-test")
-        testImplementation("org.junit.jupiter:junit-jupiter:${property("junitVersion")}")
-        testImplementation("org.mockito:mockito-core:${property("mockitoVersion")}")
-        testImplementation("org.assertj:assertj-core:${property("assertjVersion")}")
+        testImplementation("org.junit.jupiter:junit-jupiter")
+        testImplementation("org.mockito:mockito-core")
+        testImplementation("org.assertj:assertj-core")
+        testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     }
 
     the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
         imports {
             mavenBom("org.springframework.boot:spring-boot-dependencies:${property("springBootVersion")}")
-            mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
         }
     }
 

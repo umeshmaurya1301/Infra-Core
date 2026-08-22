@@ -15,7 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Phase 8 — Advanced Features & Hardening (Admin Operations).
+ * Phase 8 — Advanced Features &amp; Hardening (Admin Operations).
  *
  * <p>Handles topic auto-creation if enabled via {@code infra.kafka.admin.auto-create=true}.
  * In production, it is strongly recommended to keep this disabled and manage

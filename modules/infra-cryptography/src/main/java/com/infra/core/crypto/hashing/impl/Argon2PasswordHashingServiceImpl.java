@@ -26,7 +26,7 @@ import java.util.Base64;
  * <p>Outputs use a PHC-compatible format for self-describing, migration-friendly storage:
  * <pre>$argon2id$v=19$m=65536,t=3,p=1$&lt;base64-salt&gt;$&lt;base64-hash&gt;</pre>
  * The salt and all parameters are embedded in the string, making it completely self-contained
- * for verification.</p>
+ * for verification.
  *
  * <h2>Thread Safety</h2>
  * <p>{@link Argon2BytesGenerator} is NOT thread-safe. A new instance is created per operation.

@@ -23,14 +23,14 @@ dependencies {
     compileOnly("org.springframework.boot:spring-boot-autoconfigure")
 
     // ── Lombok ────────────────────────────────────────────────────────────
-    compileOnly("org.projectlombok:lombok:${property("lombokVersion")}")
-    annotationProcessor("org.projectlombok:lombok:${property("lombokVersion")}")
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
 
     // ── Testing ───────────────────────────────────────────────────────────
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.junit.jupiter:junit-jupiter:${property("junitVersion")}")
-    testImplementation("org.mockito:mockito-core:${property("mockitoVersion")}")
-    testImplementation("org.assertj:assertj-core:${property("assertjVersion")}")
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.mockito:mockito-core")
+    testImplementation("org.assertj:assertj-core")
 }
 
 tasks.jar {

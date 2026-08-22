@@ -3,7 +3,7 @@ package org.infra.kafka.error;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -60,14 +60,16 @@ public class DefaultKafkaErrorHandler implements CommonErrorHandler {
     /**
      * Constructs the error handler with the given backoff settings and DLQ recoverer.
      *
-     * @param kafkaTemplate        used by the recoverer to publish messages to the DLQ topic
+     * @param deadLetterTemplate   template used by the recoverer to publish messages to the DLQ
+     *                             topic; its value serializer must forward the record's raw
+     *                             {@code byte[]} value unchanged (see {@code infraKafkaDltTemplate})
      * @param dlqSuffix            suffix appended to the original topic to form the DLQ topic name
      * @param initialIntervalMs    initial backoff delay (milliseconds)
      * @param backoffMultiplier    exponential multiplier applied after each retry
      * @param maxIntervalMs        maximum backoff delay cap (milliseconds)
      * @param maxAttempts          total number of delivery attempts (including the first)
      */
-    public DefaultKafkaErrorHandler(KafkaTemplate<String, Object> kafkaTemplate,
+    public DefaultKafkaErrorHandler(KafkaOperations<?, ?> deadLetterTemplate,
                                     String dlqSuffix,
                                     long initialIntervalMs,
                                     double backoffMultiplier,
@@ -76,7 +78,7 @@ public class DefaultKafkaErrorHandler implements CommonErrorHandler {
 
         // Route failed messages to <topic><dlqSuffix>
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
-                kafkaTemplate,
+                deadLetterTemplate,
                 (record, ex) -> {
                     String dlqTopic = record.topic() + dlqSuffix;
                     log.error("[infra-kafka] DLQ → topic={} partition={} offset={} exception={}",

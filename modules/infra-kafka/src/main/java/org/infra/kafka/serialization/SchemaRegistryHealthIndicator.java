@@ -2,8 +2,8 @@ package org.infra.kafka.serialization;
 
 import lombok.extern.slf4j.Slf4j;
 import org.infra.kafka.autoconfigure.InfraKafkaProperties;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;

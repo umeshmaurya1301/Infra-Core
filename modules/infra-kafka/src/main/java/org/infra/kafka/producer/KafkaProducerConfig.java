@@ -2,6 +2,8 @@ package org.infra.kafka.producer;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.infra.kafka.autoconfigure.InfraKafkaProperties;
 import org.infra.kafka.observability.KafkaLoggingInterceptor;
 import org.infra.kafka.security.KafkaSecurityConfig;
@@ -177,6 +179,32 @@ public class KafkaProducerConfig {
         KafkaTemplate<String, Object> template = new KafkaTemplate<>(producerFactory);
         log.info("[infra-kafka] KafkaTemplate initialized");
         return template;
+    }
+
+    /**
+     * Dead-letter {@link KafkaTemplate} used by the error handlers to republish failed records to
+     * the DLQ.
+     *
+     * <p>Because the consumer reads values as raw {@code byte[]} (see
+     * {@code KafkaConsumerConfig}), a failed record's value reaching the
+     * {@code DeadLetterPublishingRecoverer} is a {@code byte[]}. Publishing it through the primary
+     * template (whose value serializer is {@code JsonSerializer}) would JSON-encode the bytes a
+     * second time, corrupting the DLQ payload. This template uses a
+     * {@link ByteArraySerializer} for values (and {@link StringSerializer} for keys) so the
+     * original JSON bytes are forwarded to the DLQ unchanged.
+     */
+    @Bean("infraKafkaDltTemplate")
+    @ConditionalOnMissingBean(name = "infraKafkaDltTemplate")
+    public KafkaTemplate<Object, Object> infraKafkaDltTemplate() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, properties.getBootstrapServers());
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
+        config.put(ProducerConfig.ACKS_CONFIG, "all");
+        securityConfig.applySecurity(config);
+
+        log.info("[infra-kafka] Dead-letter KafkaTemplate initialized (byte[] passthrough to DLQ)");
+        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(config));
     }
 
     /**

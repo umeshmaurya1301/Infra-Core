@@ -5,10 +5,12 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.infra.kafka.autoconfigure.InfraKafkaProperties;
 import org.infra.kafka.error.DefaultKafkaErrorHandler;
 import org.infra.kafka.error.DeserializationErrorHandler;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.core.KafkaTemplate;
 
 /**
@@ -81,19 +83,19 @@ public class RetryTopicConfig {
      * so that messages are retried on transient failures and routed to the DLQ after
      * all attempts are exhausted.
      *
-     * @param kafkaTemplate the template used to publish to DLQ topics
+     * @param deadLetterTemplate the byte[]-passthrough template used to publish to DLQ topics
      */
-    @Bean
-    @ConditionalOnMissingBean(DefaultKafkaErrorHandler.class)
+    @Bean("infraKafkaErrorHandler")
+    @ConditionalOnMissingBean(name = "infraKafkaErrorHandler")
     @ConditionalOnProperty(prefix = "infra.kafka.retry", name = "enabled", havingValue = "true", matchIfMissing = true)
     public DefaultKafkaErrorHandler infraKafkaErrorHandler(
-            KafkaTemplate<String, Object> kafkaTemplate) {
+            @Qualifier("infraKafkaDltTemplate") KafkaOperations<?, ?> deadLetterTemplate) {
 
         InfraKafkaProperties.RetryProperties retry   = properties.getRetry();
         InfraKafkaProperties.DlqProperties   dlq     = properties.getDlq();
 
         DefaultKafkaErrorHandler handler = new DefaultKafkaErrorHandler(
-                kafkaTemplate,
+                deadLetterTemplate,
                 dlq.getSuffix(),
                 retry.getBackoffInitialInterval(),
                 retry.getBackoffMultiplier(),
@@ -107,6 +109,41 @@ public class RetryTopicConfig {
                 retry.getBackoffInitialInterval(),
                 retry.getBackoffMultiplier(),
                 retry.getBackoffMaxInterval(),
+                dlq.getSuffix());
+
+        return handler;
+    }
+
+    /**
+     * Creates the no-retry error handler used by the
+     * {@code infraKafkaNoRetryListenerContainerFactory}.
+     *
+     * <p>Configured with {@code maxAttempts=1} (i.e. zero retries), so a failing record
+     * is routed to the DLQ ({@code <topic><dlq-suffix>}) on the very first failure. This
+     * backs listeners annotated with
+     * {@link org.infra.kafka.consumer.InfraKafkaListener#NON_RETRYING_CONTAINER_FACTORY}.
+     *
+     * @param deadLetterTemplate the byte[]-passthrough template used to publish to DLQ topics
+     */
+    @Bean("infraKafkaNoRetryErrorHandler")
+    @ConditionalOnMissingBean(name = "infraKafkaNoRetryErrorHandler")
+    public DefaultKafkaErrorHandler infraKafkaNoRetryErrorHandler(
+            @Qualifier("infraKafkaDltTemplate") KafkaOperations<?, ?> deadLetterTemplate) {
+
+        InfraKafkaProperties.RetryProperties retry = properties.getRetry();
+        InfraKafkaProperties.DlqProperties   dlq   = properties.getDlq();
+
+        // maxAttempts=1 → zero retries → straight to DLQ on first failure.
+        DefaultKafkaErrorHandler handler = new DefaultKafkaErrorHandler(
+                deadLetterTemplate,
+                dlq.getSuffix(),
+                retry.getBackoffInitialInterval(),
+                retry.getBackoffMultiplier(),
+                retry.getBackoffMaxInterval(),
+                1
+        );
+
+        log.info("[infra-kafka] No-retry DefaultKafkaErrorHandler created (immediate DLQ) — dlqSuffix={}",
                 dlq.getSuffix());
 
         return handler;
