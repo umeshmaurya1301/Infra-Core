@@ -5,14 +5,6 @@ The infrastructure has been restructured into a clean, modular architecture wher
 
 ## Module Structure
 
-### 🏗️ **infra-core** - Application Entry Point
-- **Purpose**: Main application launcher and module orchestrator
-- **Dependencies**: All other modules
-- **Contents**: 
-  - `CoreApplication.java` - Spring Boot main class
-  - Configuration aggregation
-  - Module assembly
-
 ### 🔧 **infra-commons** - Foundation Layer
 - **Purpose**: Shared utilities and common components
 - **Dependencies**: None (foundation layer)

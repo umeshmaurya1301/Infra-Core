@@ -7,8 +7,7 @@ A modern, modular infrastructure framework built with Spring Boot and Gradle, de
 The project follows a clean, modular architecture where each module has a single responsibility:
 
 ```
-infra-core (Application Entry Point)
-├── infra-commons (Foundation Layer)
+infra-commons (Foundation Layer)
 ├── infra-security (Security & Authentication)
 ├── infra-cryptography (Encryption Services)
 ├── infra-audit (Centralized Logging & Audit)
@@ -16,11 +15,6 @@ infra-core (Application Entry Point)
 ```
 
 ## 📦 **Module Structure**
-
-### **🏗️ infra-core** - Application Entry Point
-- **Purpose**: Main application launcher and module orchestrator
-- **Dependencies**: All other modules
-- **Contents**: Spring Boot main class, configuration aggregation
 
 ### **🔧 infra-commons** - Foundation Layer
 - **Purpose**: Shared utilities and common components
@@ -74,7 +68,6 @@ You can also publish individual modules:
 
 ```bash
 ./gradlew :infra-commons:publishToMavenLocal
-./gradlew :infra-core-module:publishToMavenLocal
 ./gradlew :infra-security:publishToMavenLocal
 ./gradlew :infra-cryptography:publishToMavenLocal
 ./gradlew :infra-audit:publishToMavenLocal
@@ -92,13 +85,6 @@ After publishing to Maven local, you can use these libraries in other projects b
 <dependency>
     <groupId>org.infra</groupId>
     <artifactId>infra-commons</artifactId>
-    <version>1.0.0</version>
-</dependency>
-
-<!-- Application entry point -->
-<dependency>
-    <groupId>org.infra</groupId>
-    <artifactId>infra-core-module</artifactId>
     <version>1.0.0</version>
 </dependency>
 
@@ -137,9 +123,6 @@ After publishing to Maven local, you can use these libraries in other projects b
 dependencies {
     // Foundation layer - always needed
     implementation 'org.infra:infra-commons:1.0.0'
-    
-    // Application entry point
-    implementation 'org.infra:infra-core-module:1.0.0'
     
     // Security framework
     implementation 'org.infra:infra-security:1.0.0'

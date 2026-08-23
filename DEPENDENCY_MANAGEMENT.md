@@ -47,8 +47,7 @@ Subprojects (modules/*/build.gradle.kts)
 
 ### **New Modular Architecture (2024)**
 ```
-infra-core (Application Entry Point)
-├── infra-commons (Foundation Layer)
+infra-commons (Foundation Layer)
 │   ├── BaseEntity, BaseException, DTOs
 │   ├── Utility classes, Constants
 │   └── No dependencies (foundation)
@@ -91,8 +90,6 @@ infra-core/
 └── modules/
     ├── infra-commons/
     │   └── build.gradle.kts           # Foundation layer + maven-publish
-    ├── infra-core/
-    │   └── build.gradle.kts           # Application entry point + maven-publish
     ├── infra-security/
     │   └── build.gradle.kts           # Security framework + maven-publish
     ├── infra-cryptography/
@@ -194,8 +191,6 @@ subprojects {
 infra-commons (Foundation Layer)
     ↑
 infra-security, infra-cryptography, infra-audit, infra-validation
-    ↑
-infra-core (Application Entry Point)
 ```
 
 ### Module Dependencies Detail
@@ -205,13 +200,6 @@ infra-core (Application Entry Point)
 - **Dependencies**: None (foundation layer)
 - **Exports**: `BaseEntity`, `BaseException`, `ApiResponse<T>`, `PageResponse<T>`, utility classes
 - **Spring Boot**: ❌ Not applied (pure library)
-- **Publishing**: ✅ Maven library with JAR, sources, javadoc
-
-#### 2. **infra-core**
-- **Purpose**: Application entry point and module orchestrator
-- **Dependencies**: All other modules (`infra-commons`, `infra-security`, `infra-cryptography`, `infra-audit`, `infra-validation`)
-- **Usage**: Main Spring Boot application, configuration aggregation
-- **Spring Boot**: ✅ Applied (main application)
 - **Publishing**: ✅ Maven library with JAR, sources, javadoc
 
 #### 3. **infra-security**
@@ -267,7 +255,6 @@ plugins {
 // Convenience task to publish all modules
 tasks.register("publishAllToMavenLocal") {
     dependsOn(":infra-commons:publishToMavenLocal")
-    dependsOn(":infra-core-module:publishToMavenLocal")
     dependsOn(":infra-security:publishToMavenLocal")
     dependsOn(":infra-cryptography:publishToMavenLocal")
     
@@ -330,7 +317,6 @@ publishing {
 #### Publish Individual Modules
 ```bash
 ./gradlew :infra-commons:publishToMavenLocal
-./gradlew :infra-core-module:publishToMavenLocal
 ./gradlew :infra-security:publishToMavenLocal
 ./gradlew :infra-cryptography:publishToMavenLocal
 ./gradlew :infra-audit:publishToMavenLocal
@@ -365,9 +351,6 @@ After publishing to Maven local, these libraries can be used in other projects:
 dependencies {
     // Foundation layer - always needed
     implementation 'org.infra:infra-commons:1.0.0'
-    
-    // Application entry point
-    implementation 'org.infra:infra-core-module:1.0.0'
     
     // Security framework
     implementation 'org.infra:infra-security:1.0.0'

@@ -35,11 +35,6 @@ allprojects {
 
 subprojects {
     apply(plugin = "java")
-
-    // Apply Spring Boot plugin only to modules that need it (applications, not libraries)
-    if (project.name in listOf("infra-core")) {
-        apply(plugin = "org.springframework.boot")
-    }
     apply(plugin = "io.spring.dependency-management")
 
     java {
