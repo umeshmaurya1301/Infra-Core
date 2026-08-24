@@ -255,6 +255,69 @@ class BulkheadTest {
     }
 
     /**
+     * Phase 11, 5. The two gauges that close the gap the phase plan's own
+     * hypothesis assumed was already closed - see {@code ThreadPoolBulkhead
+     * #queueDepth}'s javadoc for the metrics it predicted
+     * ({@code executor_active_threads}/{@code executor_queued_tasks}) that
+     * turned out not to exist anywhere in this project.
+     *
+     * <p>Both start at zero on an empty pool, {@code activeCount} rises to
+     * exactly the number of workers holding {@code hold}, and {@code
+     * queueDepth} rises to exactly the remainder waiting behind them - the
+     * same saturation shape {@link #callsBeyondTheLimitAreRejectedRatherThanQueuedForever}
+     * exercises, read through the new instruments instead of through
+     * rejection counts.
+     */
+    @Test
+    void queueDepthAndActiveCountTrackASaturatedPool() throws Exception {
+        ThreadPoolBulkhead pooled = new ThreadPoolBulkhead(2, 3, 2_000, 10);
+        assertThat(pooled.activeCount()).isZero();
+        assertThat(pooled.queueDepth()).isZero();
+
+        CountDownLatch hold = new CountDownLatch(1);
+        CountDownLatch running = new CountDownLatch(2);
+
+        try (ExecutorService callers = Executors.newVirtualThreadPerTaskExecutor()) {
+            // Two workers occupied...
+            for (int i = 0; i < 2; i++) {
+                callers.submit(() -> pooled.call("mockpsp", () -> {
+                    running.countDown();
+                    hold.await();
+                    return "held";
+                }));
+            }
+            assertThat(running.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // ...and two more queued behind them, inside the 3-deep queue.
+            for (int i = 0; i < 2; i++) {
+                callers.submit(() -> pooled.call("mockpsp", () -> "queued"));
+            }
+            Thread.sleep(300);
+
+            assertThat(pooled.activeCount())
+                    .as("pinned at maxConcurrentCalls, the first half of the signature")
+                    .isEqualTo(2);
+            assertThat(pooled.queueDepth())
+                    .as("the two admitted-but-not-yet-running tasks, the second half")
+                    .isEqualTo(2);
+
+            hold.countDown();
+        }
+        pooled.shutdown();
+    }
+
+    /** The semaphore implementation has no queue and no pool workers to count. */
+    @Test
+    void queueDepthAndActiveCountAreNotOnTheSemaphoreInterface() {
+        // Compile-time check as much as a runtime one: available() is the only
+        // saturation signal Bulkhead promises, and queueDepth()/activeCount()
+        // are deliberately NOT on that interface - see BulkheadMetrics, which
+        // gates both gauges behind `instanceof ThreadPoolBulkhead` for exactly
+        // this reason.
+        assertThat(new SemaphoreBulkhead(2, 100, 10)).isNotInstanceOf(ThreadPoolBulkhead.class);
+    }
+
+    /**
      * A ScopedValue does not cross a thread handoff. The thread-pool version
      * re-binds it explicitly; without that the work would run with no deadline
      * bound at all - silently, which is the worst way for a bound to be missing.

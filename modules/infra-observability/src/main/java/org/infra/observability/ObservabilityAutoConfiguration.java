@@ -7,6 +7,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
@@ -150,5 +151,20 @@ public class ObservabilityAutoConfiguration {
             return new TraceCarrier(Tracer.NOOP, Propagator.NOOP);
         }
         return new TraceCarrier(resolvedTracer, resolvedPropagator);
+    }
+
+    /**
+     * Phase 11, 1d. Off by default, on in compose - see {@link DeadlockDetector}'s
+     * own javadoc for why each of its three properties (the {@code
+     * findDeadlockedThreads()} method choice, the once-per-transition log, and
+     * the always-registered gauge) is load-bearing rather than incidental.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(MeterRegistry.class)
+    @ConditionalOnProperty(prefix = "payorch.observability.deadlock-detector", name = "enabled",
+            havingValue = "true")
+    public DeadlockDetector deadlockDetector(ObservabilityProperties properties) {
+        return new DeadlockDetector(properties.deadlockDetector().intervalSeconds());
     }
 }

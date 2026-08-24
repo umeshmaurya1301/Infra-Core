@@ -34,12 +34,39 @@ public class ChaosSeams {
 
     private final Map<String, ChaosSeam> armed = new ConcurrentHashMap<>();
     private final Map<String, LongAdder> injections = new ConcurrentHashMap<>();
+    private final ChaosLab lab;
+
+    /**
+     * No lab wired. Every seam still worked this way before phase 11, and
+     * every existing caller - including this class's own tests - constructs
+     * it like this, so it stays valid: {@link ChaosSeam.Action#PAUSE} and
+     * {@link ChaosSeam.Action#FAIL} never touch {@link #lab}.
+     */
+    public ChaosSeams() {
+        this(null);
+    }
+
+    /**
+     * @param lab backs {@link ChaosSeam.Action#DEADLOCK}, {@code LIVELOCK},
+     *        {@code STARVE} and {@code LEAK}. {@code null} is accepted - a
+     *        service that never arms one of those four actions has no need of
+     *        a lab - and arming one anyway without a lab wired fails loudly at
+     *        {@link #reach} rather than silently doing nothing.
+     */
+    public ChaosSeams(ChaosLab lab) {
+        this.lab = lab;
+    }
 
     /**
      * Runs whatever is armed for {@code name}, or returns immediately.
      *
      * @throws ChaosInjectedException if the seam is armed to fail and the roll
      *         goes against the caller
+     * @throws IllegalStateException if the seam is armed to one of the four
+     *         lab actions ({@code DEADLOCK}/{@code LIVELOCK}/{@code STARVE}/
+     *         {@code LEAK}) and no {@link ChaosLab} was wired into this
+     *         instance - {@code NESTED_SUBMIT} has no lab dependency, so
+     *         arming it never throws this
      */
     public void reach(String name) {
         ChaosSeam seam = armed.get(name);
@@ -61,7 +88,35 @@ public class ChaosSeams {
                 log.warn("chaos seam '{}' failing on purpose", name);
                 throw new ChaosInjectedException(name);
             }
+            // Four of the five state faults below defer to the lab - see its
+            // class javadoc for why a labelled lab exists rather than a fault
+            // manufactured somewhere in real code. "Still armed" is supplied as
+            // a closure over THIS seam's own name in THIS registry's armed map,
+            // which is what lets a plain disarm() stop LIVELOCK and STARVE
+            // without the lab needing to know ChaosSeams exists. NESTED_SUBMIT
+            // is the fifth and does not - see its own javadoc for why.
+            case DEADLOCK -> requireLab(name).deadlock(name);
+            case LIVELOCK -> requireLab(name).livelock(name, () -> armed.containsKey(name));
+            case STARVE -> requireLab(name).starve(() -> armed.containsKey(name));
+            // Deliberately empty. See ChaosSeam.Action#NESTED_SUBMIT's javadoc:
+            // this action has no generic implementation, because the pool it
+            // starves belongs to the caller, not to this module. Reaching it
+            // only has to do what every other reach does - the free hash
+            // lookup when disarmed, the injections() count when armed - and
+            // leave the actual nested bulkhead.call to whichever call site
+            // checked armed(name) and decided to make one.
+            case NESTED_SUBMIT -> { }
+            case LEAK -> requireLab(name).leak();
         }
+    }
+
+    private ChaosLab requireLab(String name) {
+        if (lab == null) {
+            throw new IllegalStateException("seam '" + name + "' is armed for a chaos-lab action "
+                    + "(DEADLOCK/LIVELOCK/STARVE/LEAK) but this ChaosSeams has no ChaosLab wired - "
+                    + "construct it with ChaosSeams(ChaosLab) rather than the no-arg constructor");
+        }
+        return lab;
     }
 
     /**

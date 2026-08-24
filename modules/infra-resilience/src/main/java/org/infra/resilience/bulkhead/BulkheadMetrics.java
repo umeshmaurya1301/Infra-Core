@@ -66,6 +66,32 @@ public class BulkheadMetrics implements MeterBinder {
                     .description("Platform threads allocated by the thread-pool bulkhead")
                     .tags(tags)
                     .register(registry);
+
+            // Phase 11, 5. The two metrics that closed a real instrumentation
+            // gap rather than the two the phase plan predicted
+            // (executor_active_threads / executor_queued_tasks - neither
+            // exists anywhere in this project; see ThreadPoolBulkhead#queueDepth
+            // for how that was confirmed). Registered here, under the same
+            // `instanceof ThreadPoolBulkhead` guard as platform.threads above,
+            // for the same reason: a semaphore bulkhead has no queue and no
+            // pool workers, so the series would always read zero and would
+            // not mean "healthy", it would mean "not this implementation".
+            //
+            // Unconditional once a thread-pool bulkhead exists, not gated
+            // behind a chaos flag or an experiment - see queueDepth()'s own
+            // javadoc for why a gauge born only during an incident is useless
+            // to an alert rule that needs a baseline to compare against.
+            Gauge.builder("payorch.bulkhead.queue.depth", pooled, ThreadPoolBulkhead::queueDepth)
+                    .description("Tasks queued behind the thread-pool bulkhead's own workers, summed "
+                            + "across every provider - climbing while active.count stays pinned at the "
+                            + "concurrency limit is nested-submission starvation's own signature")
+                    .tags(tags)
+                    .register(registry);
+
+            Gauge.builder("payorch.bulkhead.active.count", pooled, ThreadPoolBulkhead::activeCount)
+                    .description("Pool workers currently executing a task, summed across every provider")
+                    .tags(tags)
+                    .register(registry);
         }
     }
 }

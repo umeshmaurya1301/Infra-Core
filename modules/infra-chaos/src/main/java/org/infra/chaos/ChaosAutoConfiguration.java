@@ -16,19 +16,33 @@ import org.springframework.context.annotation.Bean;
  * property would mean the one time it is needed is the one time it is not
  * enabled.
  *
- * <p>The same applies to {@link BeanAssaultAspect}: installed always, injecting
- * nothing until {@code /actuator/chaosbeans} says otherwise. Both control
- * surfaces are exposed only if a service lists them in
+ * <p>The same applies to {@link BeanAssaultAspect} and to {@link ChaosLab}:
+ * installed always, doing nothing until {@code /actuator/chaosbeans},
+ * {@code /actuator/chaosseams} or {@code /actuator/chaoslab} says otherwise.
+ * All three control surfaces are exposed only if a service lists them in
  * {@code management.endpoints.web.exposure.include}, so nothing here becomes
  * reachable by accident.
  */
 @AutoConfiguration
 public class ChaosAutoConfiguration {
 
+    /**
+     * Phase 11, 2. Unconditional, like {@link ChaosSeams} itself - the two
+     * {@link java.util.concurrent.locks.ReentrantLock}s cost nothing until
+     * something arms {@link ChaosSeam.Action#DEADLOCK}, and gating this bean
+     * behind a property would mean {@link ChaosSeams} has nowhere to route the
+     * four lab actions in a service that later decides to use one.
+     */
     @Bean
     @ConditionalOnMissingBean
-    public ChaosSeams chaosSeams() {
-        return new ChaosSeams();
+    public ChaosLab chaosLab() {
+        return new ChaosLab();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ChaosSeams chaosSeams(ChaosLab lab) {
+        return new ChaosSeams(lab);
     }
 
     @Bean
@@ -36,6 +50,13 @@ public class ChaosAutoConfiguration {
     @ConditionalOnClass(Endpoint.class)
     public ChaosSeamsEndpoint chaosSeamsEndpoint(ChaosSeams seams) {
         return new ChaosSeamsEndpoint(seams);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(Endpoint.class)
+    public ChaosLabEndpoint chaosLabEndpoint(ChaosLab lab) {
+        return new ChaosLabEndpoint(lab);
     }
 
     @Bean

@@ -168,4 +168,95 @@ class ChaosSeamsTest {
 
         assertThat(seams.injections()).containsEntry("ledger-consumer", 1L);
     }
+
+    /**
+     * Phase 11, 5 arm B. {@code NESTED_SUBMIT} has no lab-side behaviour - the
+     * fault lives at whichever call site checks {@code armed(name)} - so
+     * {@code reach()} on a {@code ChaosSeams} with NO lab wired must still
+     * succeed and still count. This is the one state action that does not
+     * throw {@link IllegalStateException} without a lab; contrast with
+     * {@link #aLabActionWithNoLabWiredFailsLoudly()} below.
+     */
+    @Test
+    void nestedSubmitNeedsNoLabAndOnlyRecordsThatItFired() {
+        seams.arm("psp-nested-submit", new ChaosSeam(ChaosSeam.Action.NESTED_SUBMIT, 0, ChaosSeam.ALWAYS));
+
+        assertThatNoException().isThrownBy(() -> seams.reach("psp-nested-submit"));
+        assertThat(seams.injections()).containsEntry("psp-nested-submit", 1L);
+    }
+
+    /**
+     * The other half: a caller checking {@code armed(name)} directly - the
+     * pattern {@code MockPspAdapter} uses, since the actual nested {@code
+     * bulkhead.call} has to be written where the bulkhead is - must see the
+     * seam whether or not anyone has called {@code reach()} on it yet.
+     */
+    @Test
+    void armedIsVisibleToACallSiteThatChecksItDirectly() {
+        assertThat(seams.armed("psp-nested-submit")).isEmpty();
+
+        seams.arm("psp-nested-submit", new ChaosSeam(ChaosSeam.Action.NESTED_SUBMIT, 0, ChaosSeam.ALWAYS));
+
+        assertThat(seams.armed("psp-nested-submit")).isPresent();
+        seams.disarm("psp-nested-submit");
+        assertThat(seams.armed("psp-nested-submit")).isEmpty();
+    }
+
+    /**
+     * Phase 11, 2. A {@code ChaosSeams} built with the no-arg constructor - the
+     * one every pre-phase-11 caller uses - has no lab to route a state action
+     * to, and that must fail loudly at the point of use rather than silently
+     * doing nothing.
+     */
+    @Test
+    void aLabActionWithNoLabWiredFailsLoudly() {
+        seams.arm("lab-lock-ab", new ChaosSeam(ChaosSeam.Action.DEADLOCK, 0, ChaosSeam.ALWAYS));
+
+        assertThatThrownBy(() -> seams.reach("lab-lock-ab"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no ChaosLab");
+    }
+
+    /**
+     * End to end through {@code reach()}, not just against {@link ChaosLab}
+     * directly - this is the path {@code PaymentService}'s two call sites
+     * actually go through in phase 11, 3. Two seams, opposite lock orders, one
+     * thread each: both park, and {@code disarmAll()} plus {@link
+     * ChaosLab#release()} recovers both - the same two-step recovery the phase
+     * plan requires of the real experiment.
+     */
+    @Test
+    void reachDispatchesDeadlockToTheWiredLabAndRecoversAfterReleaseAndDisarm() throws InterruptedException {
+        ChaosLab lab = new ChaosLab();
+        ChaosSeams labSeams = new ChaosSeams(lab);
+        labSeams.arm("lab-lock-ab", new ChaosSeam(ChaosSeam.Action.DEADLOCK, 0, ChaosSeam.ALWAYS));
+        labSeams.arm("lab-lock-ba", new ChaosSeam(ChaosSeam.Action.DEADLOCK, 0, ChaosSeam.ALWAYS));
+
+        Thread ab = new Thread(() -> labSeams.reach("lab-lock-ab"));
+        Thread ba = new Thread(() -> labSeams.reach("lab-lock-ba"));
+        ab.start();
+        ba.start();
+
+        ab.join(800);
+        ba.join(800);
+        assertThat(ab.isAlive()).isTrue();
+        assertThat(ba.isAlive()).isTrue();
+        assertThat(labSeams.injections())
+                .containsEntry("lab-lock-ab", 1L)
+                .containsEntry("lab-lock-ba", 1L);
+
+        labSeams.disarmAll();
+        // disarmAll alone does not recover a DEADLOCK - the whole reason its
+        // row in the phase plan names TWO steps to end it. Confirmed here so a
+        // future change that "simplifies" this away breaks a test instead of
+        // shipping a lab that quietly cannot be recovered.
+        assertThat(ab.isAlive()).isTrue();
+        assertThat(ba.isAlive()).isTrue();
+
+        lab.release();
+        ab.join(2000);
+        ba.join(2000);
+        assertThat(ab.isAlive()).isFalse();
+        assertThat(ba.isAlive()).isFalse();
+    }
 }

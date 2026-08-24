@@ -46,14 +46,29 @@ public class ChaosSeamsEndpoint {
     }
 
     /**
-     * @param action  {@code PAUSE} or {@code FAIL}
-     * @param pauseMs ignored unless {@code PAUSE}. {@code @Nullable} is not
-     *        decoration: actuator treats every operation parameter as mandatory
-     *        unless it is marked nullable, so without it, arming a {@code FAIL}
-     *        seam is rejected with "Missing parameters: pauseMs" for a value
-     *        that has no meaning in that case.
+     * @param action  {@code PAUSE}, {@code FAIL}, or one of phase 11's state
+     *        actions - {@code DEADLOCK}, {@code LIVELOCK}, {@code STARVE},
+     *        {@code LEAK}, or {@code NESTED_SUBMIT}. {@code DEADLOCK} must be
+     *        armed as {@code lab-lock-ab} or {@code lab-lock-ba} - see {@code
+     *        ChaosLab#LOCK_ORDER_AB}. {@code NESTED_SUBMIT} has no lab-side
+     *        behaviour of its own - see {@code ChaosSeam.Action#NESTED_SUBMIT}
+     *        - so arming it only ever records that the seam fired; the fault
+     *        happens at whichever call site checks {@code armed(name)}.
+     * @param pauseMs meaningful only for {@code PAUSE}, where a missing value
+     *        defaults to 1000ms - every other action ignores it, and it
+     *        defaults to 0 rather than being required, because
+     *        {@code @Nullable} parameters are still accepted by actuator's
+     *        binder as absent JSON keys, and a state fault has no pause to name.
+     *        {@code @Nullable} is not decoration: actuator treats every
+     *        operation parameter as mandatory unless it is marked nullable, so
+     *        without it, arming anything but {@code PAUSE} is rejected with
+     *        "Missing parameters: pauseMs" for a value that has no meaning in
+     *        that case.
      * @param probability 0.0 to 1.0, defaulting to 1.0. Omitting it keeps the
      *        old behaviour exactly - a seam armed without one fires every time.
+     *        Applies to every action, including the four state faults: a
+     *        probabilistic livelock or leak is a legitimate thing to want, even
+     *        though phase 11's own experiments only ever arm these at 1.0.
      */
     @WriteOperation
     public Map<String, ChaosSeam> arm(@Selector String name,
@@ -61,9 +76,10 @@ public class ChaosSeamsEndpoint {
                                       @Nullable Long pauseMs,
                                       @Nullable Double probability) {
         double p = probability == null ? ChaosSeam.ALWAYS : probability;
-        seams.arm(name, action == ChaosSeam.Action.FAIL
-                ? ChaosSeam.fail(p)
-                : ChaosSeam.pause(pauseMs == null ? 1000 : pauseMs, p));
+        long resolvedPauseMs = action == ChaosSeam.Action.PAUSE
+                ? (pauseMs == null ? 1000 : pauseMs)
+                : (pauseMs == null ? 0 : pauseMs);
+        seams.arm(name, new ChaosSeam(action, resolvedPauseMs, p));
         return seams.armed();
     }
 

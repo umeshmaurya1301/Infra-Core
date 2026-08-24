@@ -223,6 +223,68 @@ public class ThreadPoolBulkhead implements Bulkhead {
         return pools.values().stream().mapToInt(ThreadPoolExecutor::getPoolSize).sum();
     }
 
+    /**
+     * Tasks queued behind the pool's own workers, summed across every provider.
+     *
+     * <p>Phase 11, 5. The plan for that section predicted an
+     * {@code executor_queued_tasks} metric climbing to the queue bound during
+     * nested-submission starvation. No such metric was ever published: this
+     * class hands its {@link ThreadPoolExecutor}s straight to
+     * {@link #pools}, a private {@code ConcurrentHashMap}, and never registers
+     * them with Micrometer's {@code ExecutorServiceMetrics} - confirmed by
+     * scraping a live {@code psp-connector}'s {@code /actuator/prometheus} and
+     * finding no series for it. This method and {@link #activeCount()} are
+     * what closes that gap, and {@link BulkheadMetrics} registers the gauges
+     * built on them <strong>unconditionally</strong>, not only once an
+     * experiment goes looking - a series born during an incident cannot be
+     * alerted on, the same reasoning {@code DeadlockDetector}'s javadoc gives
+     * for publishing its own gauge even when it reads zero.
+     *
+     * <p><strong>Aggregate, not per-key - the same choice {@link
+     * #platformThreads()} already made, for the same structural reason.</strong>
+     * A per-key gauge has to be registered against a specific executor, and
+     * this class creates one lazily per key on first use ({@link #newPool}),
+     * after {@link BulkheadMetrics} has already bound its gauges to this bean
+     * at startup. Doing it properly needs either a {@code MeterRegistry}
+     * reference inside this class - which has no Micrometer dependency today,
+     * deliberately, since it is the resilience layer and not the metrics
+     * layer - or {@code BulkheadMetrics} re-scanning {@link #pools}' keys on
+     * every scrape to register gauges for providers it has not seen before.
+     * Neither is worth the complexity for what this section actually needs: a
+     * baseline that exists before an incident, and a signal that climbs while
+     * {@link #activeCount()} stays pinned. A reader chasing which
+     * <em>specific</em> provider is stuck still has {@link #available()}'s
+     * per-key map to correlate against - this number only says whether any of
+     * them is.
+     */
+    public int queueDepth() {
+        return pools.values().stream().mapToInt(p -> p.getQueue().size()).sum();
+    }
+
+    /**
+     * Pool workers currently executing a task, summed across every provider -
+     * {@link ThreadPoolExecutor#getActiveCount()}, not {@link #available()}.
+     * The two ask related but different questions: {@code available()} counts
+     * permits free against {@link #maxConcurrentCalls}, this counts workers
+     * actually busy. They agree in this implementation only because every
+     * core thread is prestarted ({@link #newPool}) and a task is never queued
+     * without a live worker eventually able to take it - so "permits taken"
+     * and "workers busy" move together here in a way the interface does not
+     * promise in general.
+     *
+     * <p>Pinned at {@code maxConcurrentCalls} times the number of provider
+     * pools is one half of nested-submission starvation's signature (phase
+     * 11, 5); {@link #queueDepth()} climbing while this stops moving is the
+     * other. Neither alone distinguishes starvation from a pool that is
+     * merely busy - see {@code docs/experiments/32-nested-starvation.md} for
+     * why both are asserted together, and for the same pair's opposite
+     * prognosis in {@code docs/experiments/18-pool-starvation.md}, which
+     * measures HikariCP's connection pool, not a thread pool at all.
+     */
+    public int activeCount() {
+        return pools.values().stream().mapToInt(ThreadPoolExecutor::getActiveCount).sum();
+    }
+
     public void shutdown() {
         pools.values().forEach(ThreadPoolExecutor::shutdownNow);
     }
